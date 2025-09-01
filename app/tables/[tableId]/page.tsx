@@ -5,20 +5,21 @@ import OrderBuilder from '@/components/orders/OrderBuilder'
 import OrderItemsPanel from '@/components/orders/OrderItemsPanel'
 import { seatTableAndOpenOrder } from '../actions'
 
-function supabaseServer() {
-  const cookieStore = cookies()
+async function supabaseServer() {
+  const cookieStore = await cookies()
+  const headerStore = await headers()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: { get(name: string) { return cookieStore.get(name)?.value } },
-      headers: { get(name: string) { return headers().get(name) } }
+      headers: { get(name: string) { return headerStore.get(name) } }
     }
   )
 }
 
-export default async function TableDetailPage({ params }: { params: { tableId: string } }) {
-  const supabase = supabaseServer()
+export default async function TableDetailPage({ params }: any) {
+  const supabase = await supabaseServer()
 
   // 테이블 정보
   const { data: table } = await supabase

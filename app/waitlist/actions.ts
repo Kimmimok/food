@@ -89,3 +89,8 @@ export async function expireCalledOlderThan(minutes = 5) {
   if (error) throw new Error(error.message)
   revalidatePath('/waitlist')
 }
+
+// Small server-action wrapper for client components (pre-bound 5 minutes)
+export async function expireCalled5() {
+  return await expireCalledOlderThan(5)
+}

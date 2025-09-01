@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase-client'
-import { addWait, callWait, seatWait, cancelWait, noShowWait, expireCalledOlderThan } from '@/app/waitlist/actions'
+import { addWait, callWait, seatWait, cancelWait, noShowWait, expireCalled5 } from '@/app/waitlist/actions'
 
 type Wait = {
   id: string
@@ -154,7 +154,7 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
         </div>
         
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <form action={async () => { 'use server'; await expireCalledOlderThan(5) }}>
+          <form action={expireCalled5}>
             <button className="w-full h-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors">
               호출 만료 처리
               <br />

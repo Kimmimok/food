@@ -17,7 +17,7 @@ async function sb() {
   )
 }
 
-export default async function StationPage({ params }: { params: { station: string } }) {
+export default async function StationPage({ params }: any) {
   const supabase = await sb()
   const station = params.station
 
