@@ -2,11 +2,26 @@
 import React, { useState } from 'react'
 import ImageModal from '@/components/ImageModal'
 
-export default function MenuGridClient({ items }: any) {
+export default function MenuGridClient({ items, activeCategory, cart, setCart }: any) {
   const [query, setQuery] = useState('')
   const [preview, setPreview] = useState<string | null>(null)
 
-  const filtered = items.filter((m: any) => m.name.toLowerCase().includes(query.toLowerCase()))
+  const filtered = items
+    .filter((m: any) => m.name.toLowerCase().includes(query.toLowerCase()))
+    .filter((m: any) => activeCategory === 'all' || m.category_id === activeCategory)
+
+  const addToCart = (menuItem: any, quantity: number) => {
+    const existingItem = cart.find((item: any) => item.id === menuItem.id)
+    if (existingItem) {
+      setCart(cart.map((item: any) => 
+        item.id === menuItem.id 
+          ? { ...item, quantity: item.quantity + quantity }
+          : item
+      ))
+    } else {
+      setCart([...cart, { ...menuItem, quantity }])
+    }
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm">
@@ -62,6 +77,11 @@ export default function MenuGridClient({ items }: any) {
                     type="button" 
                     data-menu-id={m.id} 
                     data-menu-name={m.name} 
+                    onClick={() => {
+                      const qtySelect = document.querySelector(`[data-menu-id="${m.id}"].qty-select`) as HTMLSelectElement
+                      const quantity = parseInt(qtySelect?.value || '1')
+                      addToCart(m, quantity)
+                    }}
                     className="add-to-cart flex-1 py-3 px-4 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-lg transition-all duration-200 active:scale-95 text-base"
                   >
                     🛒 담기

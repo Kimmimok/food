@@ -79,12 +79,22 @@ export default function CartClientScript() {
   function onClick(e: Event) {
       const t = e.target as HTMLElement
       const btn = t.closest('.add-to-cart') as HTMLElement | null
-      if (!btn) return
-      const id = btn.getAttribute('data-menu-id') || ''
-      const name = btn.getAttribute('data-menu-name') || ''
-      const sel = document.querySelector(`select.qty-select[data-menu-id="${id}"]`) as HTMLSelectElement | null
-      const qty = sel ? Number(sel.value) : 1
-      addToCart(id, name, qty)
+      if (btn) {
+        const id = btn.getAttribute('data-menu-id') || ''
+        const name = btn.getAttribute('data-menu-name') || ''
+        const sel = document.querySelector(`select.qty-select[data-menu-id="${id}"]`) as HTMLSelectElement | null
+        const qty = sel ? Number(sel.value) : 1
+        addToCart(id, name, qty)
+        return
+      }
+
+      // Handle order history toggle button
+      const actionBtn = t.closest('[data-action="toggle-order-history"]') as HTMLElement | null
+      if (actionBtn) {
+        const event = new CustomEvent('toggle-order-history')
+        window.dispatchEvent(event)
+        return
+      }
     }
 
     document.addEventListener('click', onClick)

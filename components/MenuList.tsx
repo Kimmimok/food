@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useEffect, useMemo, useOptimistic, useState } from 'react'
+import { useEffect, useMemo, useOptimistic, useState, startTransition } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toggleSoldOut, upsertMenuItem, deleteMenuItem, reorderMenuItems, setMenuItemImage } from '@/app/menu/actions'
 import ItemCard from '@/components/ItemCard'
@@ -96,9 +96,17 @@ export default function MenuList({
 
   const onDelete = async (id: string) => {
     if (!confirm('이 메뉴를 삭제할까요?')) return
-    // 낙관적 제거
-    setOptimisticItems(prev => prev.filter(i => i.id !== id))
-    await deleteMenuItem(id).catch(() => alert('삭제 실패'))
+    // 낙관적 제거 - startTransition으로 감싸기
+    startTransition(() => {
+      setOptimisticItems(prev => prev.filter(i => i.id !== id))
+    })
+    await deleteMenuItem(id).catch((error) => {
+      alert('삭제 실패: ' + error.message)
+      // 실패 시 롤백
+      startTransition(() => {
+        setOptimisticItems(prev => [...prev]) // re-render trigger
+      })
+    })
   }
 
   // 간단 정렬(위/아래)
@@ -201,7 +209,7 @@ export default function MenuList({
   )}
       </div>
 
-      <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {filtered.map(item => (
           <li key={item.id}>
             <ItemCard

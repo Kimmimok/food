@@ -1,4 +1,43 @@
-# 🍽️ 레스토랑 POS 시스템 - 데이터베이스 완전 가이드
+## � 주류 메뉴 가이드
+
+### 등록된 주류 브랜드
+
+#### 소주 (Soju)
+- **참이슬**: ₩4,000 (국내 1위 브랜드)
+- **처음처럼**: ₩4,000 (젊은 층 선호)
+- **진로**: ₩4,500 (전통 브랜드)
+- **한라산**: ₩4,200 (제주도 브랜드)
+- **좋은데이**: ₩3,800 (가성비 브랜드)
+
+#### 막걸리 (Makgeolli)
+- **국순당 생 막걸리**: ₩3,500 (프리미엄 브랜드)
+- **문배주 양조 생 막걸리**: ₩4,000 (전통 방식)
+- **황금보리**: ₩3,800 (대중적 브랜드)
+- **지평 생 막걸리**: ₩4,200 (수제 막걸리)
+- **배상면주가 생 막걸리**: ₩4,500 (고급 브랜드)
+
+#### 맥주 (Beer)
+- **카스**: ₩4,000 (국내 대표)
+- **하이트**: ₩4,000 (역사 깊은 브랜드)
+- **클라우드**: ₩4,500 (클라우드 생 드래프트)
+- **테라**: ₩4,500 (저칼로리 맥주)
+- **아사히**: ₩5,000 (일본 수입맥주)
+- **칭따오**: ₩4,800 (중국 수입맥주)
+- **버드와이저**: ₩5,500 (미국 수입맥주)
+- **호가든**: ₩6,000 (벨기에 화이트 에일)
+
+### 주류 메뉴 옵션
+- **소주**: 온도 선택 (시원하게/차갑게)
+- **막걸리**: 용량 선택 (750ml/500ml)
+- **맥주**: 용량 선택 (500ml/355ml)
+
+### 특징
+- 모든 주류 메뉴는 `bar` 스테이션으로 설정
+- 실제 브랜드명과 적정 가격 적용
+- Unsplash 이미지 URL로 시각적 효과 제공
+- 옵션 선택으로 고객 맞춤 서비스 가능
+
+---️ 레스토랑 POS 시스템 - 데이터베이스 완전 가이드
 ## Database Complete Guide for Restaurant POS System
 
 ---
@@ -435,6 +474,205 @@ SELECT mog.id, '밥 없음', -1000, 3
 FROM menu_option_group mog WHERE mog.name = '밥 종류';
 ```
 
+### 주류 메뉴 데이터 (실제 브랜드)
+```sql
+-- 주류 카테고리 추가 (중복 방지)
+INSERT INTO public.menu_category (id, name, sort_order, is_active)
+SELECT gen_random_uuid(), '주류', 4, true
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.menu_category WHERE name = '주류'
+);
+
+-- 소주 메뉴 등록 (중복 방지)
+INSERT INTO public.menu_item (id, category_id, name, price, is_active, sort_order, image_url, station)
+SELECT
+    gen_random_uuid(),
+    mc.id,
+    menu_data.name,
+    menu_data.price,
+    true,
+    menu_data.sort_order,
+    menu_data.image_url,
+    'bar'
+FROM (
+    VALUES
+    ('참이슬', 4000, 1, 'https://images.unsplash.com/photo-1586375300773-8384e3e4916f?w=400&q=80&auto=format&fit=crop'),
+    ('처음처럼', 4000, 2, 'https://images.unsplash.com/photo-1586375300773-8384e3e4916f?w=400&q=80&auto=format&fit=crop'),
+    ('진로', 4500, 3, 'https://images.unsplash.com/photo-1586375300773-8384e3e4916f?w=400&q=80&auto=format&fit=crop'),
+    ('한라산', 4200, 4, 'https://images.unsplash.com/photo-1586375300773-8384e3e4916f?w=400&q=80&auto=format&fit=crop'),
+    ('좋은데이', 3800, 5, 'https://images.unsplash.com/photo-1586375300773-8384e3e4916f?w=400&q=80&auto=format&fit=crop')
+) AS menu_data(name, price, sort_order, image_url)
+CROSS JOIN menu_category mc
+WHERE mc.name = '주류'
+  AND NOT EXISTS (
+      SELECT 1 FROM public.menu_item mi
+      WHERE mi.name = menu_data.name
+  );
+
+-- 막걸리 메뉴 등록 (중복 방지)
+INSERT INTO public.menu_item (id, category_id, name, price, is_active, sort_order, image_url, station)
+SELECT
+    gen_random_uuid(),
+    mc.id,
+    menu_data.name,
+    menu_data.price,
+    true,
+    menu_data.sort_order,
+    menu_data.image_url,
+    'bar'
+FROM (
+    VALUES
+    ('국순당 생 막걸리', 3500, 6, 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80&auto=format&fit=crop'),
+    ('문배주 양조 생 막걸리', 4000, 7, 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80&auto=format&fit=crop'),
+    ('황금보리', 3800, 8, 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80&auto=format&fit=crop'),
+    ('지평 생 막걸리', 4200, 9, 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80&auto=format&fit=crop'),
+    ('배상면주가 생 막걸리', 4500, 10, 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80&auto=format&fit=crop')
+) AS menu_data(name, price, sort_order, image_url)
+CROSS JOIN menu_category mc
+WHERE mc.name = '주류'
+  AND NOT EXISTS (
+      SELECT 1 FROM public.menu_item mi
+      WHERE mi.name = menu_data.name
+  );
+
+-- 맥주 메뉴 등록 (중복 방지)
+INSERT INTO public.menu_item (id, category_id, name, price, is_active, sort_order, image_url, station)
+SELECT
+    gen_random_uuid(),
+    mc.id,
+    menu_data.name,
+    menu_data.price,
+    true,
+    menu_data.sort_order,
+    menu_data.image_url,
+    'bar'
+FROM (
+    VALUES
+    ('카스', 4000, 11, 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&q=80&auto=format&fit=crop'),
+    ('하이트', 4000, 12, 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&q=80&auto=format&fit=crop'),
+    ('클라우드', 4500, 13, 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&q=80&auto=format&fit=crop'),
+    ('테라', 4500, 14, 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&q=80&auto=format&fit=crop'),
+    ('아사히', 5000, 15, 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&q=80&auto=format&fit=crop'),
+    ('칭따오', 4800, 16, 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&q=80&auto=format&fit=crop'),
+    ('버드와이저', 5500, 17, 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&q=80&auto=format&fit=crop'),
+    ('호가든', 6000, 18, 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&q=80&auto=format&fit=crop')
+) AS menu_data(name, price, sort_order, image_url)
+CROSS JOIN menu_category mc
+WHERE mc.name = '주류'
+  AND NOT EXISTS (
+      SELECT 1 FROM public.menu_item mi
+      WHERE mi.name = menu_data.name
+  );
+```
+
+### 주류 메뉴 옵션 데이터
+```sql
+-- 소주 옵션 그룹 생성 (온도 선택)
+INSERT INTO menu_option_group (id, menu_item_id, name, min_select, max_select, sort_order)
+SELECT gen_random_uuid(), mi.id, '온도 선택', 1, 1, 1
+FROM menu_item mi
+WHERE mi.name IN ('참이슬', '처음처럼', '진로', '한라산', '좋은데이')
+  AND NOT EXISTS (
+      SELECT 1 FROM menu_option_group mog
+      WHERE mog.menu_item_id = mi.id AND mog.name = '온도 선택'
+  );
+
+-- 소주 온도 옵션 추가
+INSERT INTO menu_option (id, group_id, name, price_delta, sort_order)
+SELECT gen_random_uuid(), mog.id, '시원하게', 0, 1
+FROM menu_option_group mog
+WHERE mog.name = '온도 선택'
+  AND mog.menu_item_id IN (
+    SELECT id FROM menu_item WHERE name IN ('참이슬', '처음처럼', '진로', '한라산', '좋은데이')
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM menu_option mo
+      WHERE mo.group_id = mog.id AND mo.name = '시원하게'
+  );
+
+INSERT INTO menu_option (id, group_id, name, price_delta, sort_order)
+SELECT gen_random_uuid(), mog.id, '차갑게', 0, 2
+FROM menu_option_group mog
+WHERE mog.name = '온도 선택'
+  AND mog.menu_item_id IN (
+    SELECT id FROM menu_item WHERE name IN ('참이슬', '처음처럼', '진로', '한라산', '좋은데이')
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM menu_option mo
+      WHERE mo.group_id = mog.id AND mo.name = '차갑게'
+  );
+
+-- 맥주 옵션 그룹 생성 (용량 선택)
+INSERT INTO menu_option_group (id, menu_item_id, name, min_select, max_select, sort_order)
+SELECT gen_random_uuid(), mi.id, '용량 선택', 1, 1, 1
+FROM menu_item mi
+WHERE mi.name IN ('카스', '하이트', '클라우드', '테라', '아사히', '칭따오', '버드와이저', '호가든')
+  AND NOT EXISTS (
+      SELECT 1 FROM menu_option_group mog
+      WHERE mog.menu_item_id = mi.id AND mog.name = '용량 선택'
+  );
+
+-- 맥주 용량 옵션 추가
+INSERT INTO menu_option (id, group_id, name, price_delta, sort_order)
+SELECT gen_random_uuid(), mog.id, '500ml', 0, 1
+FROM menu_option_group mog
+WHERE mog.name = '용량 선택'
+  AND mog.menu_item_id IN (
+    SELECT id FROM menu_item WHERE name IN ('카스', '하이트', '클라우드', '테라', '아사히', '칭따오', '버드와이저', '호가든')
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM menu_option mo
+      WHERE mo.group_id = mog.id AND mo.name = '500ml'
+  );
+
+INSERT INTO menu_option (id, group_id, name, price_delta, sort_order)
+SELECT gen_random_uuid(), mog.id, '355ml', -500, 2
+FROM menu_option_group mog
+WHERE mog.name = '용량 선택'
+  AND mog.menu_item_id IN (
+    SELECT id FROM menu_item WHERE name IN ('카스', '하이트', '클라우드', '테라', '아사히', '칭따오', '버드와이저', '호가든')
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM menu_option mo
+      WHERE mo.group_id = mog.id AND mo.name = '355ml'
+  );
+
+-- 막걸리 옵션 그룹 생성 (용량 선택)
+INSERT INTO menu_option_group (id, menu_item_id, name, min_select, max_select, sort_order)
+SELECT gen_random_uuid(), mi.id, '용량 선택', 1, 1, 1
+FROM menu_item mi
+WHERE mi.name IN ('국순당 생 막걸리', '문배주 양조 생 막걸리', '황금보리', '지평 생 막걸리', '배상면주가 생 막걸리')
+  AND NOT EXISTS (
+      SELECT 1 FROM menu_option_group mog
+      WHERE mog.menu_item_id = mi.id AND mog.name = '용량 선택'
+  );
+
+-- 막걸리 용량 옵션 추가
+INSERT INTO menu_option (id, group_id, name, price_delta, sort_order)
+SELECT gen_random_uuid(), mog.id, '750ml', 0, 1
+FROM menu_option_group mog
+WHERE mog.name = '용량 선택'
+  AND mog.menu_item_id IN (
+    SELECT id FROM menu_item WHERE name IN ('국순당 생 막걸리', '문배주 양조 생 막걸리', '황금보리', '지평 생 막걸리', '배상면주가 생 막걸리')
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM menu_option mo
+      WHERE mo.group_id = mog.id AND mo.name = '750ml'
+  );
+
+INSERT INTO menu_option (id, group_id, name, price_delta, sort_order)
+SELECT gen_random_uuid(), mog.id, '500ml', -1000, 2
+FROM menu_option_group mog
+WHERE mog.name = '용량 선택'
+  AND mog.menu_item_id IN (
+    SELECT id FROM menu_item WHERE name IN ('국순당 생 막걸리', '문배주 양조 생 막걸리', '황금보리', '지평 생 막걸리', '배상면주가 생 막걸리')
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM menu_option mo
+      WHERE mo.group_id = mog.id AND mo.name = '500ml'
+  );
+```
+
 ---
 
 ## 🔐 관리자 정책
@@ -527,6 +765,53 @@ GROUP BY
         ELSE '2000원 초과'
     END
 ORDER BY 옵션_개수 DESC;
+```
+
+### 주류 메뉴 분석 쿼리
+```sql
+-- 주류 메뉴 판매 현황
+SELECT
+    mc.name as 카테고리,
+    mi.name as 메뉴_이름,
+    mi.price as 가격,
+    COUNT(oi.id) as 주문_횟수,
+    SUM(oi.qty) as 총_판매량,
+    SUM(oi.qty * oi.price_snapshot) as 총_매출
+FROM menu_category mc
+JOIN menu_item mi ON mi.category_id = mc.id
+LEFT JOIN order_item oi ON oi.menu_item_id = mi.id
+WHERE mc.name = '주류'
+GROUP BY mc.name, mi.name, mi.price
+ORDER BY 총_매출 DESC;
+
+-- 주류별 옵션 선택 현황
+SELECT
+    mi.name as 주류_메뉴,
+    mog.name as 옵션_그룹,
+    mo.name as 선택된_옵션,
+    COUNT(oio.id) as 선택_횟수,
+    SUM(oio.price_delta) as 추가_금액_합계
+FROM menu_item mi
+JOIN menu_option_group mog ON mog.menu_item_id = mi.id
+JOIN menu_option mo ON mo.group_id = mog.id
+LEFT JOIN order_item_option oio ON oio.option_name = mo.name
+WHERE mi.category_id IN (SELECT id FROM menu_category WHERE name = '주류')
+GROUP BY mi.name, mog.name, mo.name
+ORDER BY mi.name, mog.name, 선택_횟수 DESC;
+
+-- 시간대별 주류 판매 분석
+SELECT
+    DATE_TRUNC('hour', ot.created_at) as 시간대,
+    mi.name as 주류_메뉴,
+    COUNT(oi.id) as 주문_건수,
+    SUM(oi.qty) as 총_수량
+FROM order_ticket ot
+JOIN order_item oi ON oi.order_id = ot.id
+JOIN menu_item mi ON mi.id = oi.menu_item_id
+WHERE mi.category_id IN (SELECT id FROM menu_category WHERE name = '주류')
+  AND ot.created_at >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY DATE_TRUNC('hour', ot.created_at), mi.name
+ORDER BY 시간대 DESC, 주문_건수 DESC;
 ```
 
 ### 데이터 정리 (주의해서 사용)

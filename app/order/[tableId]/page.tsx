@@ -3,6 +3,7 @@ import { addToTableOrder, getOrCreateOpenOrder } from '../actions'
 import CartClientScript from '@/components/CartClientScript'
 import ClientCart from '@/components/ClientCart'
 import { supabaseServer } from '@/lib/supabase-server'
+import ClientOrderPanel from '@/components/ClientOrderPanel'
 
 export default async function OrderQrPage({ params }: any) {
   const tableId = params.tableId
@@ -66,39 +67,24 @@ export default async function OrderQrPage({ params }: any) {
             {/* Client-side cart renders and CartClientScript syncs hidden input */}
             <ClientCart initialItems={[]} tableId={tableId} />
             <input type="hidden" name="cart" value="[]" />
-            <button type="submit" disabled className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-95">
-              🛒 주문하기
-            </button>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                data-action="toggle-order-history"
+                className="flex-1 py-4 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-95 text-base border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={false} // 장바구니 상태에 따라 활성화/비활성화할 수 있음
+              >
+                📋 주문내역
+              </button>
+              <button type="submit" disabled className="flex-1 py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-95">
+                🛒 주문하기
+              </button>
+            </div>
           </form>
           <CartClientScript />
         </div>
-      </div>
-    </div>
-  )
-}
-
-function ClientOrderPanel({ tableId, categories, items }: any) {
-  return (
-    <div className="space-y-6 py-6">
-      <CategoryTabs categories={categories} />
-      <MenuGrid items={items} />
-    </div>
-  )
-}
-
-function CategoryTabs({ categories }: any) {
-  return (
-    <div className="bg-white rounded-xl p-4 shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">카테고리</h3>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {categories.map((c: any) => (
-          <button
-            key={c.id}
-            className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-full border border-blue-200 text-sm font-medium whitespace-nowrap transition-colors duration-200 active:scale-95"
-          >
-            {c.name}
-          </button>
-        ))}
       </div>
     </div>
   )

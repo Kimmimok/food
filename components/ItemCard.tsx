@@ -144,7 +144,7 @@ export default function ItemCard({
 
           {img && (
             <div className="mt-2 relative w-full h-36">
-              <NextImage src={img} alt={item.name} fill className="object-cover rounded" sizes="(max-width: 768px) 100vw, 33vw" />
+              <NextImage src={img} alt={item.name} fill className="object-cover rounded" sizes="(max-width: 768px) 100vw, 33vw" priority />
             </div>
           )}
 
