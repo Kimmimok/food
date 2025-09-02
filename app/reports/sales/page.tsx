@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
-import SalesChart from '@/components/reports/SalesChart'
+// charts removed — using summary cards instead
 import { requireRole } from '@/lib/auth'
 
 async function sb() {
@@ -67,63 +67,80 @@ export default async function SalesReportsPage() {
 				</div>
 			</div>
 
-			{/* 요약 통계 카드 */}
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-				<div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-					<div className="flex items-center justify-between">
-						<div>
-							<p className="text-blue-100 text-sm font-medium">총 매출</p>
-							<p className="text-3xl font-bold mt-2">₩ {totalSales.toLocaleString()}</p>
-						</div>
-						<div className="text-3xl opacity-80">💰</div>
-					</div>
-					<div className="mt-4 text-sm text-blue-100">
-						전체 누적 매출
-					</div>
-				</div>
+			{/* 요약 기간별 카드 (일별/주별/월별/전체) */}
+			<div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+				{(() => {
+					const rows = daily as Row[]
+					const parseDate = (s: string) => {
+						const d = new Date(s)
+						return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+					}
 
-				<div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
-					<div className="flex items-center justify-between">
-						<div>
-							<p className="text-green-100 text-sm font-medium">총 주문수</p>
-							<p className="text-3xl font-bold mt-2">{totalOrders.toLocaleString()} 건</p>
-						</div>
-						<div className="text-3xl opacity-80">📋</div>
-					</div>
-					<div className="mt-4 text-sm text-green-100">
-						누적 처리 주문
-					</div>
-				</div>
+					const today = new Date()
+					const todayKey = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
-				<div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
-					<div className="flex items-center justify-between">
-						<div>
-							<p className="text-purple-100 text-sm font-medium">주문당 평균</p>
-							<p className="text-3xl font-bold mt-2">₩ {avgOrder.toLocaleString()}</p>
-						</div>
-						<div className="text-3xl opacity-80">🎯</div>
-					</div>
-					<div className="mt-4 text-sm text-purple-100">
-						평균 주문 금액
-					</div>
-				</div>
-			</div>
+					const sumRange = (days: number) => {
+						if (!rows || rows.length === 0) return { sales: 0, orders: 0 }
+						const cutoff = new Date(todayKey)
+						cutoff.setDate(cutoff.getDate() - (days - 1))
+						let sales = 0
+						let orders = 0
+						for (const r of rows) {
+							const d = parseDate(r.sales_date)
+							if (d >= cutoff && d <= todayKey) {
+								sales += Number(r.total_sales || 0)
+								orders += Number(r.orders || 0)
+							}
+						}
+						return { sales, orders }
+					}
 
-			{/* 차트 섹션 */}
-			<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-				<div className="flex items-center justify-between mb-6">
-					<h2 className="text-lg font-semibold text-gray-900">일별 매출 추이</h2>
-					<div className="flex items-center space-x-2">
-						<button className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50">7일</button>
-						<button className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md">30일</button>
-						<button className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50">90일</button>
-					</div>
-				</div>
-				<SalesChart rows={(daily as Row[]).map(r => ({
-					date: r.sales_date,
-					sales: Number(r.total_sales || 0),
-					orders: Number(r.orders || 0)
-				}))} />
+					const dailyStat = rows.length ? (() => {
+						// find most recent day's stats
+						const last = rows[rows.length - 1]
+						return { sales: Number(last.total_sales || 0), orders: Number(last.orders || 0), label: new Date(last.sales_date).toLocaleDateString('ko-KR') }
+					})() : { sales: 0, orders: 0, label: '-' }
+
+					const week = sumRange(7)
+					const month = sumRange(30)
+					const overall = { sales: totalSales, orders: totalOrders }
+
+					const cards = [
+						{ title: '일별', subtitle: dailyStat.label, sales: dailyStat.sales, orders: dailyStat.orders, color: 'from-blue-100 to-blue-200', emoji: '📅' },
+						{ title: '주별 (7일)', subtitle: '최근 7일', sales: week.sales, orders: week.orders, color: 'from-green-100 to-green-200', emoji: '🗓️' },
+						{ title: '월별 (30일)', subtitle: '최근 30일', sales: month.sales, orders: month.orders, color: 'from-purple-100 to-purple-200', emoji: '📈' },
+						{ title: '전체', subtitle: '누적', sales: overall.sales, orders: overall.orders, color: 'from-orange-100 to-orange-200', emoji: '💰' }
+					]
+
+					return cards.map(c => {
+						const avgOrder = c.orders > 0 ? Math.round(c.sales / c.orders) : 0
+						return (
+							<div key={c.title} className={`bg-gradient-to-r ${c.color} rounded-xl p-6 text-gray-900 border border-gray-200`}>
+								<div className="flex items-center justify-between mb-4">
+									<div>
+										<p className="text-gray-900 text-lg font-medium">{c.title} <span className="opacity-70 text-base">{c.subtitle}</span></p>
+									</div>
+									<div className="text-3xl opacity-60">{c.emoji}</div>
+								</div>
+
+								<div className="space-y-3">
+									<div>
+										<p className="text-base opacity-70">매출</p>
+										<p className="text-2xl font-bold text-gray-800">₩ {Number(c.sales || 0).toLocaleString()}</p>
+									</div>
+									<div>
+										<p className="text-base opacity-70">주문수</p>
+										<p className="text-2xl font-bold text-gray-800">{Number(c.orders || 0).toLocaleString()} 건</p>
+									</div>
+									<div>
+										<p className="text-base opacity-70">주문당 평균</p>
+										<p className="text-2xl font-bold text-gray-800">₩ {avgOrder.toLocaleString()}</p>
+									</div>
+								</div>
+							</div>
+						)
+					})
+				})()}
 			</div>
 
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

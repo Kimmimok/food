@@ -74,6 +74,47 @@ export async function markTableEmpty(tableId: string) {
   revalidatePath('/cashier')
 }
 
+/** 테이블 정리완료 처리 (dirty -> empty) */
+export async function markTableClean(tableId: string) {
+  const supabase = await supabaseServer()
+
+  // 테이블 상태를 empty로 변경 (정리 완료)
+  const { error } = await supabase
+    .from('dining_table')
+  .update({ status: 'empty' })
+  .eq('id', tableId)
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/tables')
+  revalidatePath(`/tables/${tableId}`)
+}
+
+/** 모든 정리 필요 테이블을 사용 가능으로 변경 */
+export async function markAllTablesClean() {
+  const supabase = await supabaseServer()
+
+  // 정리 필요(결제/완료된 오더가 있는) 테이블들의 id를 먼저 조회한 뒤 표를 비웁니다.
+  const { data: tablesWithDoneOrders, error: qErr } = await supabase
+    .from('order_ticket')
+    .select('table_id')
+    .in('status', ['completed', 'paid'])
+
+  if (qErr) throw new Error(qErr.message)
+
+  const tableIds = Array.isArray(tablesWithDoneOrders) ? Array.from(new Set(tablesWithDoneOrders.map((r: any) => r.table_id))) : []
+
+  if (tableIds.length === 0) return revalidatePath('/tables')
+
+  const { error } = await supabase
+    .from('dining_table')
+    .update({ status: 'empty' })
+    .in('id', tableIds)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/tables')
+}
+
 /** 메뉴를 주문 항목으로 추가 */
 export async function addOrderItem(params: {
   orderId: string

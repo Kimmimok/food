@@ -4,7 +4,7 @@ import Link from 'next/link'
 
 type OrderItem = { name_snapshot: string; qty: number }
 
-export default function TableCard({ table, order }: { table: any; order?: any | null }) {
+export default function TableCard({ table, order, onCleanComplete }: { table: any; order?: any | null; onCleanComplete?: (tableId: string) => void }) {
   const [roundedMinutes, setRoundedMinutes] = useState<number>(0)
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function TableCard({ table, order }: { table: any; order?: any | 
 
       <div className="text-sm text-gray-600 mb-3">최대 {table.capacity ?? 4}명</div>
 
-      {order ? (
+      {order && table.status !== 'dirty' ? (
         <div className="text-sm text-gray-700 space-y-2">
           <div>주문시간: {new Date(order.created_at).toLocaleString()}</div>
           {order.status === 'completed' || order.status === 'paid' ? (
@@ -75,15 +75,34 @@ export default function TableCard({ table, order }: { table: any; order?: any | 
             </ul>
           </div>
         </div>
+      ) : table.status === 'dirty' ? (
+        <div className="text-sm text-yellow-700 space-y-2">
+          <div className="text-yellow-600 font-medium">🧹 정리 필요</div>
+          <div>결제가 완료되어 테이블 정리가 필요합니다.</div>
+          <div className="text-xs text-gray-500 mt-2">새로고침 시 사용 가능 상태로 전환됩니다.</div>
+        </div>
       ) : (
         <div className="text-sm text-gray-400">현재 오픈된 주문이 없습니다</div>
       )}
 
-      <div className="mt-4 flex justify-end">
-        <Link href={`/tables/${table.id}`} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-xs font-medium">
-          <span aria-hidden>🔍</span>
-          <span>상세</span>
-        </Link>
+      <div className="mt-4 flex justify-end gap-2">
+        {table.status === 'dirty' && onCleanComplete ? (
+          <button
+            onClick={() => onCleanComplete(table.id)}
+            className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-xs font-medium"
+          >
+            <span aria-hidden>✅</span>
+            <span>정리완료</span>
+          </button>
+        ) : (
+          <button
+            disabled
+            className="inline-flex items-center gap-1 px-2 py-1 bg-gray-400 text-gray-200 rounded cursor-not-allowed text-xs font-medium"
+          >
+            <span aria-hidden>🔍</span>
+            <span>상세</span>
+          </button>
+        )}
       </div>
     </div>
   )
