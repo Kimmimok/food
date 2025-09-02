@@ -5,8 +5,10 @@ const STATIONS = [
 	{ id: 'bar', name: '바', desc: '음료 및 주류', icon: '🥤' },
 	{ id: 'dessert', name: '디저트', desc: '후식 및 커피', icon: '🍰' },
 ]
+import { requireRole } from '@/lib/auth'
 
-export default function KitchenHome() {
+export default async function KitchenHome() {
+	await requireRole(['manager','admin'])
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">

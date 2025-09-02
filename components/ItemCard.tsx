@@ -1,7 +1,49 @@
 // @ts-nocheck
-'use client'
+"use client"
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import NextImage from 'next/image'
+import { supabase } from '@/lib/supabase-client'
+import { setMenuItemImage } from '@/app/menu/actions'
+
+// helper: resize image file to a Blob (JPEG) with max dimension
+async function resizeImageToBlob(file: File, maxDim = 400): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement('img')
+    const reader = new FileReader()
+    reader.onload = () => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.naturalWidth
+        let height = img.naturalHeight
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round(height * (maxDim / width))
+            width = maxDim
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round(width * (maxDim / height))
+            height = maxDim
+          }
+        }
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return reject(new Error('Canvas not supported'))
+        ctx.drawImage(img, 0, 0, width, height)
+        canvas.toBlob((b) => {
+          if (!b) return reject(new Error('Failed to encode image'))
+          resolve(b)
+        }, 'image/jpeg', 0.85)
+      }
+      img.onerror = reject
+      img.src = reader.result as string
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 type Category = { id: string; name: string }
 type Item = {
@@ -10,6 +52,7 @@ type Item = {
   price: number
   category_id: string | null
   is_sold_out: boolean
+  image_url?: string | null
 }
 
 export default function ItemCard({
@@ -33,6 +76,48 @@ export default function ItemCard({
   const [name, setName] = useState(item.name)
   const [price, setPrice] = useState(String(item.price))
   const [categoryId, setCategoryId] = useState(item.category_id ?? '')
+  const [img, setImg] = useState<string | null>(item.image_url ?? null)
+  const fileRef = useRef<HTMLInputElement | null>(null)
+
+  const changeImage = async (file: File) => {
+    try {
+      const client = supabase()
+  // resize to thumbnail before upload (max 400px)
+  const resizedBlob = await resizeImageToBlob(file, 400)
+  const ext = 'jpg'
+  const safeName = file.name.replace(/[^a-z0-9.-_]/gi, '_')
+  const path = `${item.id}/${Date.now()}_${safeName}.${ext}`
+  // try upload (let Supabase infer content type)
+  const { data: upData, error: upErr } = await client.storage.from('menu-images').upload(path, resizedBlob, { upsert: true })
+      if (upErr) {
+        console.error('Supabase upload error', upErr)
+        alert('이미지 업로드 실패: ' + (upErr.message ?? JSON.stringify(upErr)))
+        return
+      }
+
+      const { data: pub } = client.storage.from('menu-images').getPublicUrl(path)
+      if (!pub?.publicUrl) {
+        console.error('No publicUrl from getPublicUrl', pub, upData)
+        alert('이미지 업로드 후 공개 URL을 생성하지 못했습니다.')
+        return
+      }
+
+      await setMenuItemImage(item.id, pub.publicUrl)
+      setImg(pub.publicUrl)
+    } catch (e:any) {
+      console.error('changeImage exception', e)
+      alert('이미지 업로드 실패: ' + (e?.message ?? String(e)))
+    }
+  }
+
+  const removeImage = async () => {
+    try {
+      await setMenuItemImage(item.id, null)
+      setImg(null)
+    } catch (e:any) {
+      alert('이미지 제거 실패: ' + e.message)
+    }
+  }
 
   const commit = async () => {
     const priceNum = Number(price)
@@ -57,6 +142,12 @@ export default function ItemCard({
             </span>
           </div>
 
+          {img && (
+            <div className="mt-2 relative w-full h-36">
+              <NextImage src={img} alt={item.name} fill className="object-cover rounded" sizes="(max-width: 768px) 100vw, 33vw" />
+            </div>
+          )}
+
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button onClick={() => onToggleSoldOut(item.id, !item.is_sold_out)} className="px-3 py-2 rounded border text-sm hover:bg-muted">
               {item.is_sold_out ? '판매 재개' : '품절 처리'}
@@ -80,6 +171,26 @@ export default function ItemCard({
               <option value="">무카테고리</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            {img && (
+              <div className="relative w-full h-36">
+                <NextImage src={img} alt="preview" fill className="object-cover rounded" sizes="(max-width: 768px) 100vw, 33vw" />
+              </div>
+            )}
+            <div className="flex gap-2 items-center">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0]
+                  if (f) changeImage(f)
+                }}
+              />
+              <button type="button" onClick={() => fileRef.current?.click()} className="px-3 py-2 rounded border text-sm">사진 변경</button>
+              {img && <button type="button" onClick={removeImage} className="px-3 py-2 rounded border text-sm">사진 제거</button>}
+            </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button onClick={commit} className="px-3 py-2 rounded bg-black text-white text-sm">저장</button>

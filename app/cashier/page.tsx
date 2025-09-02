@@ -2,6 +2,7 @@
 import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import CashierPanel from '@/components/CashierPanel'
+import { requireRole } from '@/lib/auth'
 
 async function sb() {
 	const c = await cookies()
@@ -17,6 +18,7 @@ async function sb() {
 }
 
 export default async function CashierPage() {
+	await requireRole(['manager','admin'])
 	const supabase = await sb()
 
 	// 열린 주문 불러오기

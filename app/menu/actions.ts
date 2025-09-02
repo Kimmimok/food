@@ -1,24 +1,13 @@
 // @ts-nocheck
-'use server'
+"use server"
 
 import { revalidatePath } from 'next/cache'
-import { createServerClient } from '@supabase/ssr'
-import { cookies, headers } from 'next/headers'
-
-function supabaseServer() {
-  const cookieStore = cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: { get(name: string) { return cookieStore.get(name)?.value } },
-      headers: { get(name: string) { return headers().get(name) } }
-    }
-  )
-}
+import { requireRole } from '@/lib/auth'
+import { supabaseServer } from '@/lib/supabase-server'
 
 export async function toggleSoldOut(id: string, isSoldOut: boolean) {
-  const supabase = supabaseServer()
+  await requireRole(['manager','admin'])
+  const supabase = await supabaseServer()
   const { error } = await supabase
     .from('menu_item')
     .update({ is_sold_out: isSoldOut })
@@ -34,33 +23,68 @@ export async function upsertMenuItem(payload: {
   category_id?: string | null
   is_active?: boolean
 }) {
-  const supabase = supabaseServer()
+  await requireRole(['manager','admin'])
+  const supabase = await supabaseServer()
   const row = {
-    id: payload.id,
     name: payload.name,
     price: payload.price,
     category_id: payload.category_id ?? null,
     is_active: payload.is_active ?? true,
+  } as any
+
+  // insert or update and return id
+  let id: string | null = null
+  if (payload.id) {
+    const { data, error } = await supabase
+      .from('menu_item')
+      .update(row)
+      .eq('id', payload.id)
+      .select('id')
+      .single()
+    if (error) throw new Error(error.message)
+    id = data?.id ?? payload.id
+  } else {
+    const { data, error } = await supabase
+      .from('menu_item')
+      .insert(row)
+      .select('id')
+      .single()
+    if (error) throw new Error(error.message)
+    id = data?.id ?? null
   }
-  const { error } = await supabase.from('menu_item').upsert(row as any, { onConflict: 'id' })
-  if (error) throw new Error(error.message)
+
   revalidatePath('/menu')
+  return { id }
 }
 
 export async function deleteMenuItem(id: string) {
-  const supabase = supabaseServer()
+  await requireRole(['manager','admin'])
+  const supabase = await supabaseServer()
   const { error } = await supabase.from('menu_item').delete().eq('id', id)
   if (error) throw new Error(error.message)
   revalidatePath('/menu')
 }
 
 export async function reorderMenuItems(order: { id: string; sort_order: number }[]) {
-  const supabase = supabaseServer()
+  await requireRole(['manager','admin'])
+  const supabase = await supabaseServer()
   const updates = order.map(o => ({
     id: o.id,
     sort_order: o.sort_order,
   }))
   const { error } = await supabase.from('menu_item').upsert(updates as any)
+  if (error) throw new Error(error.message)
+  revalidatePath('/menu')
+}
+
+// 이미지 URL 저장/초기화
+export async function setMenuItemImage(id: string, image_url: string | null) {
+  await requireRole(['manager','admin'])
+  const supabase = await supabaseServer()
+  const { error } = await supabase
+    .from('menu_item')
+    .update({ image_url })
+    .eq('id', id)
   if (error) throw new Error(error.message)
   revalidatePath('/menu')
 }

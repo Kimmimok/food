@@ -1,28 +1,54 @@
 ﻿// @ts-nocheck
-import Link from 'next/link'
-import { createServerClient } from '@supabase/ssr'
 import { cookies, headers } from 'next/headers'
+import { supabaseServer } from '@/lib/supabase-server'
+import Link from 'next/link'
+import TableCard from '@/components/TableCard'
 import { seatTableAndOpenOrder, markTableEmpty } from './actions'
 
-async function supabaseServer() {
-	const cookieStore = await cookies()
-	const h = await headers()
-	return createServerClient(
-		process.env.NEXT_PUBLIC_SUPABASE_URL!,
-		process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-		{
-			cookies: { get(name: string) { return cookieStore.get(name)?.value } },
-			headers: { get(name: string) { return h.get(name) } }
-		}
-	)
-}
+ 
 
 export default async function TablesPage() {
 	const supabase = await supabaseServer()
-	const { data: tables = [] } = await supabase
-		.from('dining_table')
-		.select('*')
-		.order('label', { ascending: true })
+		const { data: tablesRaw = [] } = await supabase
+			.from('dining_table')
+			.select('*')
+			.order('label', { ascending: true })
+
+		// if no physical table rows, fall back to configured table_count
+		let tables = tablesRaw || []
+			if ((!tables || tables.length === 0)) {
+				const { data: settings } = await supabase.from('restaurant_settings').select('table_count').eq('id', 1).maybeSingle()
+						const count = settings?.table_count ?? 0
+						const cap = settings?.default_table_capacity ?? 4
+						const caps = Array.isArray(settings?.table_capacities) ? settings.table_capacities : []
+						if (count > 0) {
+							tables = Array.from({ length: count }, (_, i) => ({
+								id: String(i + 1),
+								label: String(i + 1),
+								capacity: Number(caps[i] ?? cap),
+								status: 'empty'
+							}))
+						}
+			}
+
+			// fetch latest open order for the tables (if any)
+			const tableIds = tables.map((t: any) => t.id)
+			let ordersMap: Record<string, any> = {}
+				if (tableIds.length) {
+					const resp = await supabase
+						.from('order_ticket')
+						.select('id, table_id, status, created_at, items:order_item(name_snapshot, qty)')
+						.in('table_id', tableIds)
+						.in('status', ['open','sent_to_kitchen'])
+						.order('created_at', { ascending: false })
+
+					const orders = Array.isArray(resp.data) ? resp.data : []
+
+					// map to latest per table
+					for (const o of orders) {
+						if (!ordersMap[o.table_id]) ordersMap[o.table_id] = { id: o.id, status: o.status, created_at: o.created_at, items: o.items ?? [] }
+					}
+				}
 
 	const statusStats = tables.reduce((acc, table) => {
 		acc[table.status] = (acc[table.status] || 0) + 1;
@@ -73,33 +99,10 @@ export default async function TablesPage() {
 
 			{/* 테이블 그리드 */}
 			<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
-					{tables.map(t => (
-						<div key={t.id} className={`rounded-lg border-2 p-4 flex flex-col ${getTableStyle(t.status)}`}>
-							<div className="flex items-center justify-between mb-3">
-								<div className="font-bold text-lg">{t.label}</div>
-								<span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusBadgeStyle(t.status)}`}>
-									{getStatusLabel(t.status)}
-								</span>
-							</div>
-							
-							<div className="text-sm text-gray-600 mb-4">
-								최대 {t.capacity}명
-							</div>
-							
-							<div className="flex gap-2 mt-auto">
-								<Link 
-									href={`/tables/${t.id}`} 
-									className="flex-1 text-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-								>
-									상세보기
-								</Link>
-								{t.status !== 'seated' ? (
-									<SeatButton tableId={t.id} />
-								) : (
-									<EmptyButton tableId={t.id} />
-								)}
-							</div>
+				<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+					{tables.map((t: any) => (
+						<div key={t.id}>
+							<TableCard table={t} order={ordersMap[String(t.id)]} />
 						</div>
 					))}
 				</div>

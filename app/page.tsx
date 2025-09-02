@@ -1,4 +1,7 @@
-﻿export default function Page() {
+﻿import { requireRole } from '@/lib/auth'
+
+export default async function Page() {
+  await requireRole(['member','manager','admin'])
   return (
     <div className="space-y-6">
       <div>

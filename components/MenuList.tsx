@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useOptimistic, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { toggleSoldOut, upsertMenuItem, deleteMenuItem, reorderMenuItems } from '@/app/menu/actions'
+import { toggleSoldOut, upsertMenuItem, deleteMenuItem, reorderMenuItems, setMenuItemImage } from '@/app/menu/actions'
 import ItemCard from '@/components/ItemCard'
 import { supabase } from '@/lib/supabase-client'
 
@@ -15,6 +15,7 @@ type Item = {
   category_id: string | null
   is_sold_out: boolean
   sort_order: number
+  image_url?: string | null
 }
 
 export default function MenuList({
@@ -24,6 +25,18 @@ export default function MenuList({
   categories: Category[]
   initialItems: Item[]
 }) {
+  const [role, setRole] = useState<'guest'|'member'|'manager'|'admin'>('guest')
+  useEffect(() => {
+    const client = supabase()
+    client.auth.getUser().then(({ data }) => {
+      const user = data?.user ?? null
+      if (!user) return setRole('guest')
+      // fetch profile role (if exists)
+      client.from('user_profile').select('role').eq('id', user.id).maybeSingle().then(({ data: p }) => {
+        setRole((p?.role as any) ?? 'member')
+      }).catch(() => setRole('member'))
+    })
+  }, [])
   const params = useSearchParams()
   const currentCat = params.get('cat') ?? 'all'
 
@@ -77,7 +90,8 @@ export default function MenuList({
 
   // 신규/수정 저장
   const onSave = async (form: { id?: string; name: string; price: number; category_id?: string | null }) => {
-    await upsertMenuItem(form as any).catch(e => alert(e.message))
+    const res = await upsertMenuItem(form as any).catch(e => { alert(e.message); return null })
+    return res
   }
 
   const onDelete = async (id: string) => {
@@ -106,8 +120,8 @@ export default function MenuList({
   }
 
   // 신규 생성용 폼
-  const [draft, setDraft] = useState<{ name: string; price: string; category_id: string | '' }>(
-    { name: '', price: '', category_id: '' }
+  const [draft, setDraft] = useState<{ name: string; price: string; category_id: string | ''; file?: File | null }>(
+    { name: '', price: '', category_id: '', file: null }
   )
 
   return (
@@ -125,17 +139,32 @@ export default function MenuList({
           </button>
         </div>
 
-        <form
+  { (role === 'manager' || role === 'admin') && (
+  <form
           onSubmit={async (e) => {
             e.preventDefault()
             const priceNum = Number(draft.price)
             if (!draft.name || Number.isNaN(priceNum)) return alert('이름/가격을 확인하세요.')
-            await onSave({
+            const result = await onSave({
               name: draft.name,
               price: priceNum,
               category_id: draft.category_id || null,
             })
-            setDraft({ name: '', price: '', category_id: '' })
+            // 새 항목 생성 직후 이미지가 있다면 업로드 처리
+            if (result?.id && draft.file) {
+              try {
+                const client = supabase()
+                const file = draft.file
+                const path = `${result.id}/${Date.now()}_${file.name}`
+                const { error: upErr } = await client.storage.from('menu-images').upload(path, file, { upsert: true, contentType: file.type })
+                if (upErr) throw upErr
+                const { data: pub } = client.storage.from('menu-images').getPublicUrl(path)
+                await setMenuItemImage(result.id, pub.publicUrl)
+              } catch (e:any) {
+                alert('이미지 업로드 실패: ' + e.message)
+              }
+            }
+            setDraft({ name: '', price: '', category_id: '', file: null })
           }}
           className="flex flex-wrap gap-2"
         >
@@ -160,8 +189,16 @@ export default function MenuList({
             <option value="">카테고리(선택)</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={e => setDraft(s => ({ ...s, file: e.target.files?.[0] ?? null }))}
+            className="border rounded px-3 py-2 text-sm"
+          />
           <button className="px-3 py-2 rounded bg-black text-white text-sm">추가</button>
-        </form>
+  </form>
+  )}
       </div>
 
       <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -171,7 +208,10 @@ export default function MenuList({
               item={item}
               categories={categories}
               onToggleSoldOut={onToggle}
-              onSave={onSave}
+              onSave={async (form) => {
+                const res = await onSave(form)
+                return res
+              }}
               onDelete={() => onDelete(item.id)}
               onMoveUp={() => move(item.id, -1)}
               onMoveDown={() => move(item.id, +1)}

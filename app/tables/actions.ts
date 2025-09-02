@@ -2,21 +2,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerClient } from '@supabase/ssr'
 import { cookies, headers } from 'next/headers'
-
-async function supabaseServer() {
-  const cookieStore = await cookies()
-  const h = await headers()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: { get(name: string) { return cookieStore.get(name)?.value } },
-      headers: { get(name: string) { return h.get(name) } }
-    }
-  )
-}
+import { supabaseServer } from '@/lib/supabase-server'
 
 /** 테이블 착석 & 오픈 주문 생성(없으면) */
 export async function seatTableAndOpenOrder(tableId: string) {
@@ -117,7 +104,7 @@ export async function removeOrderItem(orderItemId: string) {
 
 /** 수량 변경 */
 export async function updateQty(orderItemId: string, qty: number) {
-  const supabase = supabaseServer()
+  const supabase = await supabaseServer()
   const { error } = await supabase.from('order_item').update({ qty }).eq('id', orderItemId)
   if (error) throw new Error(error.message)
 }

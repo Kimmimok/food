@@ -1,22 +1,11 @@
 // @ts-nocheck
 import { cookies, headers } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
+import { supabaseServer } from '@/lib/supabase-server'
 import OrderBuilder from '@/components/orders/OrderBuilder'
 import OrderItemsPanel from '@/components/orders/OrderItemsPanel'
 import { seatTableAndOpenOrder } from '../actions'
 
-async function supabaseServer() {
-  const cookieStore = await cookies()
-  const headerStore = await headers()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: { get(name: string) { return cookieStore.get(name)?.value } },
-      headers: { get(name: string) { return headerStore.get(name) } }
-    }
-  )
-}
+
 
 export default async function TableDetailPage({ params }: any) {
   const supabase = await supabaseServer()

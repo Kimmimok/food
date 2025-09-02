@@ -2,6 +2,7 @@
 import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import SalesChart from '@/components/reports/SalesChart'
+import { requireRole } from '@/lib/auth'
 
 async function sb() {
 	const c = await cookies()
@@ -23,6 +24,7 @@ type Row = {
 }
 
 export default async function SalesReportsPage() {
+	await requireRole(['admin'])
 	const supabase = await sb()
 
 	// 1) 일별 매출 (v_sales_daily 뷰)
