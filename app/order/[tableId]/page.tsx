@@ -36,32 +36,46 @@ export default async function OrderQrPage({ params }: any) {
   await getOrCreateOpenOrder(tableId, 'qr')
 
   return (
-    <div className="max-w-screen-sm mx-auto p-4 space-y-4">
-      <div className="text-center space-y-1">
-        <h1 className="text-xl font-bold">{tableLabel} 주문</h1>
-        <p className="text-sm opacity-70">원하는 메뉴를 선택해 담아주세요</p>
-        {!isValidTable && (
-          <div className="text-xs text-yellow-600">테이블 정보가 등록되어 있지 않습니다. 임시 주문으로 처리됩니다.</div>
-        )}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-screen-sm mx-auto px-4 py-4">
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl font-bold text-gray-900">{tableLabel}</h1>
+            <p className="text-base text-gray-600">메뉴를 선택하고 주문해보세요</p>
+            {!isValidTable && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800">⚠️ 테이블 정보가 등록되어 있지 않습니다. 임시 주문으로 처리됩니다.</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <ClientOrderPanel tableId={tableId} categories={categories} items={items} />
+      {/* Main Content */}
+      <div className="max-w-screen-sm mx-auto px-4 pb-32">
+        <ClientOrderPanel tableId={tableId} categories={categories} items={items} />
+      </div>
 
-      {/* Cart and submit form */}
-      <div>
-        <form action={async (formData: FormData) => {
-          'use server'
-          const raw = String(formData.get('cart') || '[]')
-          let parsed = []
-          try { parsed = JSON.parse(raw) } catch {}
-          await import('../actions').then(m=>m.addMultipleToTableOrder({ tableId, items: parsed }))
-        }} className="space-y-3">
-          {/* Client-side cart renders and CartClientScript syncs hidden input */}
-          <ClientCart initialItems={[]} tableId={tableId} />
-          <input type="hidden" name="cart" value="[]" />
-          <button type="submit" className="w-full px-3 py-2 bg-green-600 text-white rounded">주문 제출</button>
-        </form>
-        <CartClientScript />
+      {/* Cart and submit form - Fixed bottom */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+        <div className="max-w-screen-sm mx-auto p-4">
+          <form action={async (formData: FormData) => {
+            'use server'
+            const raw = String(formData.get('cart') || '[]')
+            let parsed = []
+            try { parsed = JSON.parse(raw) } catch {}
+            await import('../actions').then(m=>m.addMultipleToTableOrder({ tableId, items: parsed }))
+          }} className="space-y-4">
+            {/* Client-side cart renders and CartClientScript syncs hidden input */}
+            <ClientCart initialItems={[]} tableId={tableId} />
+            <input type="hidden" name="cart" value="[]" />
+            <button type="submit" className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-95">
+              🛒 주문하기
+            </button>
+          </form>
+          <CartClientScript />
+        </div>
       </div>
     </div>
   )
@@ -69,7 +83,7 @@ export default async function OrderQrPage({ params }: any) {
 
 function ClientOrderPanel({ tableId, categories, items }: any) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 py-6">
       <CategoryTabs categories={categories} />
       <MenuGrid items={items} />
     </div>
@@ -77,12 +91,19 @@ function ClientOrderPanel({ tableId, categories, items }: any) {
 }
 
 function CategoryTabs({ categories }: any) {
-  // 간단 표시(필터는 생략 - MVP)
   return (
-    <div className="flex gap-2 overflow-x-auto">
-      {categories.map((c: any) => (
-        <span key={c.id} className="px-3 py-1 rounded-full border text-sm whitespace-nowrap">{c.name}</span>
-      ))}
+    <div className="bg-white rounded-xl p-4 shadow-sm">
+      <h3 className="text-lg font-semibold text-gray-900 mb-3">카테고리</h3>
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        {categories.map((c: any) => (
+          <button
+            key={c.id}
+            className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-full border border-blue-200 text-sm font-medium whitespace-nowrap transition-colors duration-200 active:scale-95"
+          >
+            {c.name}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
