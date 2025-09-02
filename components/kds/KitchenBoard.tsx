@@ -132,17 +132,21 @@ export default function KitchenBoard({
   }, [])
 
   const grouped = useMemo(() => {
-    const g: Record<string, KQueue[]> = { queued: [], in_progress: [], done: [], served: [] }
-    for (const r of rows) g[r.status]?.push(r)
+    const g: Record<string, KQueue[]> = { queued: [], in_progress: [], done: [] }
+    for (const r of rows) {
+      // 서빙완료된 항목들은 표시하지 않음
+      if (r.status !== 'served') {
+        g[r.status]?.push(r)
+      }
+    }
     return g
   }, [rows])
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <Section title="접수" items={grouped.queued} tableLabelMap={tableLabelMap} />
       <Section title="조리중" items={grouped.in_progress} tableLabelMap={tableLabelMap} />
       <Section title="완료" items={grouped.done} tableLabelMap={tableLabelMap} />
-      <Section title="서빙완료" items={grouped.served} tableLabelMap={tableLabelMap} />
     </div>
   )
 }
@@ -153,16 +157,16 @@ function Section({ title, items, tableLabelMap }:{
   tableLabelMap: Record<string,string>
 }) {
   return (
-    <div className="rounded-xl border p-3 min-h-[200px]">
-      <div className="font-semibold mb-2">{title} ({items.length})</div>
-      <ul className="space-y-2">
+    <div className="rounded-xl border-2 border-gray-300 p-6 min-h-[300px] bg-gray-50">
+      <div className="font-bold text-xl mb-4 text-center">{title} ({items.length})</div>
+      <ul className="space-y-3">
         {items.map(q => (
           <li key={q.id}>
             <KitchenCard q={q} tableLabelMap={tableLabelMap} />
           </li>
         ))}
       </ul>
-      {items.length === 0 && <p className="text-xs opacity-60">없음</p>}
+      {items.length === 0 && <p className="text-lg opacity-60 text-center mt-8">없음</p>}
     </div>
   )
 }

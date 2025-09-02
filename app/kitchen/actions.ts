@@ -50,43 +50,45 @@ export async function setKitchenStatus(orderItemId: string, next: KStatus) {
 export async function bulkMarkDone(station: string) {
   const supabase = await sb()
 
-  // 음료/주류 스테이션은 주방에서 처리하지 않음
-  if (station === 'beverages') {
-    return
-  }
-
   // find order_items by station
   const { data: items = [], error: e } = await supabase
     .from('order_item')
     .select('id, menu_item:menu_item_id(id, station), status')
   if (e) throw new Error(e.message)
-  const ids = items.filter((it:any)=> (it.menu_item?.station||'main')===station && ['queued','in_progress'].includes(it.status)).map((it:any)=>it.id)
+  const ids = items.filter((it:any)=> {
+    const itemStation = it.menu_item?.station || 'main'
+    // beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+    const effectiveStation = itemStation === 'bar' ? 'beverages' : itemStation
+    return effectiveStation === station && ['queued','in_progress'].includes(it.status)
+  }).map((it:any)=>it.id)
   if (ids.length) {
     await supabase.from('order_item').update({ status: 'done' }).in('id', ids)
     // Also update kitchen_queue
     await supabase.from('kitchen_queue').update({ status: 'done' }).in('order_item_id', ids)
   }
   revalidatePath(`/kitchen/${station}`)
+  revalidatePath(`/serving/${station}`)
 }
 
 /** 완료된 것을 서빙완료 처리 */
 export async function bulkMarkServed(station: string) {
   const supabase = await sb()
 
-  // 음료/주류 스테이션은 주방에서 처리하지 않음
-  if (station === 'beverages') {
-    return
-  }
-
   const { data: items = [], error: e } = await supabase
     .from('order_item')
     .select('id, menu_item:menu_item_id(id, station), status')
   if (e) throw new Error(e.message)
-  const ids = items.filter((it:any)=> (it.menu_item?.station||'main')===station && it.status==='done').map((it:any)=>it.id)
+  const ids = items.filter((it:any)=> {
+    const itemStation = it.menu_item?.station || 'main'
+    // beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+    const effectiveStation = itemStation === 'bar' ? 'beverages' : itemStation
+    return effectiveStation === station && it.status === 'done'
+  }).map((it:any)=>it.id)
   if (ids.length) {
     await supabase.from('order_item').update({ status: 'served' }).in('id', ids)
     // Also update kitchen_queue
     await supabase.from('kitchen_queue').update({ status: 'served' }).in('order_item_id', ids)
   }
   revalidatePath(`/kitchen/${station}`)
+  revalidatePath(`/serving/${station}`)
 }

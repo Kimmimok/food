@@ -71,19 +71,19 @@ export default function KitchenCard({ q, tableLabelMap }: { q: KQueue, tableLabe
   }
 
   return (
-    <div className="border rounded p-2">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <div className="font-medium text-sm">{q.order_item?.name_snapshot} × {q.order_item?.qty}</div>
-          {tableLabel && <div className="text-xs opacity-70">테이블 {tableLabel}</div>}
+    <div className="border-2 border-gray-300 rounded-lg p-4 bg-white shadow-sm min-h-[120px]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1">
+          <div className="font-semibold text-lg">{q.order_item?.name_snapshot} × {q.order_item?.qty}</div>
+          {tableLabel && <div className="text-sm opacity-70 mt-1">테이블 {tableLabel}</div>}
         </div>
-        <span className="text-xs border rounded px-2 py-0.5">{badge(q.status)}</span>
+        <span className="text-sm border rounded-full px-3 py-1 bg-gray-100">{badge(q.status)}</span>
       </div>
 
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        <button onClick={toInProgress} disabled={q.status!=='queued' || loadingInProgress} className="px-2 py-1 border rounded text-xs disabled:opacity-40">{loadingInProgress ? '처리중...' : '조리시작'}</button>
-        <button onClick={toDone} disabled={q.status!=='in_progress' || loadingDone} className="px-2 py-1 border rounded text-xs disabled:opacity-40">{loadingDone ? '처리중...' : '완료'}</button>
-        <button onClick={toServed} disabled={q.status!=='done' || loadingServed} className="px-2 py-1 border rounded text-xs disabled:opacity-40">{loadingServed ? '처리중...' : '서빙완료'}</button>
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        <button onClick={toInProgress} disabled={q.status!=='queued' || loadingInProgress} className="px-4 py-2 border-2 border-blue-500 rounded-lg text-sm font-medium bg-blue-50 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed">{loadingInProgress ? '처리중...' : '조리시작'}</button>
+        <button onClick={toDone} disabled={q.status!=='in_progress' || loadingDone} className="px-4 py-2 border-2 border-green-500 rounded-lg text-sm font-medium bg-green-50 hover:bg-green-100 disabled:opacity-40 disabled:cursor-not-allowed">{loadingDone ? '처리중...' : '완료'}</button>
+        <button onClick={toServed} disabled={q.status!=='done' || loadingServed} className="px-4 py-2 border-2 border-purple-500 rounded-lg text-sm font-medium bg-purple-50 hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed">{loadingServed ? '처리중...' : '서빙완료'}</button>
       </div>
     </div>
   )

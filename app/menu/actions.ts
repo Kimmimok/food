@@ -58,7 +58,7 @@ export async function upsertMenuItem(payload: {
 }
 
 export async function deleteMenuItem(id: string) {
-  // await requireRole(['manager','admin']) // 임시로 권한 검사 제거
+  await requireRole(['manager','admin'])
   const supabase = await supabaseServer()
 
   try {
@@ -69,7 +69,12 @@ export async function deleteMenuItem(id: string) {
       .eq('id', id)
       .single()
 
-    if (fetchError || !menuItem) {
+    if (fetchError) {
+      console.error('Failed to fetch menu item:', fetchError)
+      throw new Error('메뉴를 찾을 수 없습니다: ' + fetchError.message)
+    }
+
+    if (!menuItem) {
       throw new Error('메뉴를 찾을 수 없습니다.')
     }
 
@@ -88,39 +93,42 @@ export async function deleteMenuItem(id: string) {
       throw new Error(`이 메뉴는 ${orderItems.length}개의 주문에서 사용되어 삭제할 수 없습니다. 먼저 관련 주문을 취소해주세요.`)
     }
 
-    // 직접 삭제 시도 (단순화)
-    // 1. menu_option_group의 id들을 가져와서 옵션 삭제
-    const { data: optionGroups } = await supabase
-      .from('menu_option_group')
-      .select('id')
-      .eq('menu_item_id', id)
+    // 간단하게 menu_item만 삭제 시도 (외래 키 제약 조건에 따라 자동으로 관련 데이터 삭제)
+    const { error: deleteError } = await supabase
+      .from('menu_item')
+      .delete()
+      .eq('id', id)
 
-    if (optionGroups) {
-      for (const group of optionGroups) {
-        await supabase
-          .from('menu_option')
-          .delete()
-          .eq('group_id', group.id)
+    if (deleteError) {
+      console.error('Failed to delete menu item:', deleteError)
+
+      // 더 구체적인 에러 메시지 제공
+      if (deleteError.message.includes('foreign key')) {
+        throw new Error('이 메뉴는 다른 데이터에서 참조되어 삭제할 수 없습니다. 관련 데이터를 먼저 삭제해주세요.')
+      } else if (deleteError.message.includes('permission')) {
+        throw new Error('메뉴 삭제 권한이 없습니다.')
+      } else {
+        throw new Error('메뉴 삭제 실패: ' + deleteError.message)
       }
     }
 
-    // 2. menu_option_group 삭제
-    await supabase
-      .from('menu_option_group')
-      .delete()
-      .eq('menu_item_id', id)
-
-    // 3. menu_item 삭제
-    const { error } = await supabase.from('menu_item').delete().eq('id', id)
-    if (error) {
-      console.error('Failed to delete menu item:', error)
-      throw new Error('메뉴 삭제 실패: ' + error.message)
-    }
-
     revalidatePath('/menu')
+    return { success: true, message: '메뉴가 성공적으로 삭제되었습니다.' }
+
   } catch (error: any) {
     console.error('Delete menu item error:', error)
-    throw error
+
+    // 이미 우리가 만든 에러인 경우 그대로 전달
+    if (error.message.includes('메뉴를 찾을 수 없습니다') ||
+        error.message.includes('주문에서 사용되어') ||
+        error.message.includes('참조되어 삭제할 수 없습니다') ||
+        error.message.includes('삭제 권한이 없습니다') ||
+        error.message.includes('메뉴 삭제 실패')) {
+      throw error
+    }
+
+    // 기타 예기치 않은 에러
+    throw new Error('메뉴 삭제 중 알 수 없는 오류가 발생했습니다: ' + (error.message || 'Unknown error'))
   }
 }
 

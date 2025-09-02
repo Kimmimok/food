@@ -39,23 +39,23 @@ export default function ServingCard({ q, tableLabelMap }: { q: SQueue, tableLabe
   }
 
   return (
-    <div className="border rounded p-2 bg-green-50">
-      <div className="flex items-start justify-between gap-2">
+    <div className="border-2 border-gray-300 rounded-lg p-4 bg-green-50 shadow-sm min-h-[120px]">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <div className="font-medium text-sm">{q.order_item?.name_snapshot} × {q.order_item?.qty}</div>
-          {tableLabel && <div className="text-xs opacity-70">테이블 {tableLabel}</div>}
+          <div className="font-semibold text-lg">{q.order_item?.name_snapshot} × {q.order_item?.qty}</div>
+          {tableLabel && <div className="text-sm opacity-70 mt-1">테이블 {tableLabel}</div>}
           {q.done_at && (
-            <div className="text-xs text-green-600">
+            <div className="text-sm text-green-600 mt-1">
               완료 시간: {new Date(q.done_at).toLocaleTimeString()}
             </div>
           )}
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <span className="text-xs border rounded px-2 py-0.5 bg-green-100 text-green-700">{badge(q.status)}</span>
+        <div className="flex flex-col items-end gap-3">
+          <span className="text-sm border rounded-full px-3 py-1 bg-green-100 text-green-700">{badge(q.status)}</span>
           <button
             onClick={toServed}
             disabled={q.status !== 'done' || loadingServed}
-            className="px-3 py-1 bg-green-600 text-white rounded text-xs disabled:opacity-40 hover:bg-green-700 disabled:cursor-not-allowed whitespace-nowrap"
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-40 hover:bg-green-700 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {loadingServed ? '처리중...' : '서빙완료'}
           </button>

@@ -32,6 +32,8 @@ export default async function TablesPage() {
 			}
 
 			// fetch latest order for the tables (모든 상태 포함)
+			const tableIds = tables.map((t: any) => t.id)
+			let ordersMap: Record<string, any> = {}
 			const resp = await supabase
 				.from('order_ticket')
 				.select('id, table_id, status, created_at, items:order_item(name_snapshot, qty)')

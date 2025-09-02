@@ -28,7 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         ) : (
           <div className="flex h-screen">
             {/* 사이드바 네비게이션 */}
-            <nav className="w-64 bg-white border-r border-gray-200 flex flex-col">
+            <nav className="w-48 bg-white border-r border-gray-200 flex flex-col">
                 <div className="p-6 border-b border-gray-200">
                   <h1 className="text-xl font-bold text-gray-900">🍽️ {restaurantName}</h1>
                   <p className="text-sm text-gray-500 mt-1">통합 관리 시스템</p>

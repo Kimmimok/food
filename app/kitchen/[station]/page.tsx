@@ -51,20 +51,25 @@ export default async function StationPage({ params }: { params: Promise<{ statio
 
   let queue = []
   if ((kq || []).length > 0) {
-    queue = (kq || []).map((r: any) => ({
-      id: String(r.id),
-      // prefer order_item.status when available
-      status: (Array.isArray(r.order_item) ? r.order_item[0]?.status : r.order_item?.status) ?? r.status,
-      created_at: r.created_at ?? null,
-      started_at: r.started_at ?? null,
-      done_at: r.done_at ?? null,
-      order_item: r.order_item ? ({
-        id: String(r.order_item.id),
-        name_snapshot: r.order_item.name_snapshot,
-        qty: r.order_item.qty,
-        order_ticket: r.order_item.order_ticket ? { id: r.order_item.order_ticket.id, table_id: r.order_item.order_ticket.table_id } : null,
-      }) : null
-    }))
+    queue = (kq || [])
+      .filter((r: any) => {
+        const status = (Array.isArray(r.order_item) ? r.order_item[0]?.status : r.order_item?.status) ?? r.status
+        return status !== 'done' && status !== 'served' // 완료된 항목들은 표시하지 않음
+      })
+      .map((r: any) => ({
+        id: String(r.id),
+        // prefer order_item.status when available
+        status: (Array.isArray(r.order_item) ? r.order_item[0]?.status : r.order_item?.status) ?? r.status,
+        created_at: r.created_at ?? null,
+        started_at: r.started_at ?? null,
+        done_at: r.done_at ?? null,
+        order_item: r.order_item ? ({
+          id: String(r.order_item.id),
+          name_snapshot: r.order_item.name_snapshot,
+          qty: r.order_item.qty,
+          order_ticket: r.order_item.order_ticket ? { id: r.order_item.order_ticket.id, table_id: r.order_item.order_ticket.table_id } : null,
+        }) : null
+      }))
   } else {
     // Fallback to order_item -> menu_item.station mapping
     const { data: items = [] } = await supabase
@@ -81,7 +86,9 @@ export default async function StationPage({ params }: { params: Promise<{ statio
       .filter((it: any) => {
         const itemStation = it.menu_item?.station || 'main'
         // beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
-        return itemStation === station || (station === 'beverages' && itemStation === 'bar')
+        const stationMatch = itemStation === station || (station === 'beverages' && itemStation === 'bar')
+        const statusFilter = it.status !== 'done' && it.status !== 'served' // 완료된 항목들은 표시하지 않음
+        return stationMatch && statusFilter
       })
       .map((it: any) => ({
         id: String(it.id),
@@ -115,12 +122,12 @@ export default async function StationPage({ params }: { params: Promise<{ statio
   const ServedAll = async () => { 'use server'; await bulkMarkServed(station) }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">KDS — {station}</h2>
-        <div className="flex gap-2">
-          <form action={DoneAll}><button className="px-3 py-2 border rounded text-sm">모두 완료</button></form>
-          <form action={ServedAll}><button className="px-3 py-2 border rounded text-sm">완료 → 서빙완료</button></form>
+        <h2 className="text-4xl font-bold">KDS — {station}</h2>
+        <div className="flex gap-4">
+          <form action={DoneAll}><button className="px-6 py-3 bg-green-600 text-white rounded-lg text-lg font-semibold hover:bg-green-700 transition-colors">모두 완료</button></form>
+          <form action={ServedAll}><button className="px-6 py-3 bg-purple-600 text-white rounded-lg text-lg font-semibold hover:bg-purple-700 transition-colors">완료 → 서빙완료</button></form>
         </div>
       </div>
 

@@ -51,8 +51,8 @@ export default function TableCard({ table, order }: { table: any; order?: any | 
     <div className={`rounded-lg border-2 p-4 flex flex-col bg-white ${getOrderStatusStyle(order?.status)}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="font-bold text-lg">{table.label}</div>
-        <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusBadgeStyle(table.status)}`}>
-          {getStatusLabel(table.status)}
+        <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusBadgeStyle(order ? table.status : 'empty')}`}>
+          {getStatusLabel(order ? table.status : 'empty')}
         </span>
       </div>
 
@@ -70,7 +70,7 @@ export default function TableCard({ table, order }: { table: any; order?: any | 
             <div className="text-xs text-gray-500">주문메뉴</div>
             <ul className="mt-1 text-sm list-disc list-inside">
               {order.items && order.items.length > 0 ? order.items.map((it: OrderItem, i: number) => (
-                <li key={i}>{it.qty} × {it.name_snapshot}</li>
+                <li key={i}>{it.name_snapshot} × {it.qty}</li>
               )) : <li className="text-gray-400">항목 없음</li>}
             </ul>
           </div>
@@ -94,6 +94,7 @@ function getStatusBadgeStyle(status: string) {
     case 'seated': return 'bg-green-100 text-green-800'
     case 'dirty': return 'bg-yellow-100 text-yellow-800'
     case 'reserved': return 'bg-blue-100 text-blue-800'
+    case 'empty': return 'bg-gray-100 text-gray-800'
     default: return 'bg-gray-100 text-gray-800'
   }
 }
@@ -117,6 +118,7 @@ function getStatusLabel(status: string) {
     case 'seated': return '사용중'
     case 'dirty': return '정리 필요'
     case 'reserved': return '예약됨'
+    case 'empty': return '사용 가능'
     default: return '사용 가능'
   }
 }
