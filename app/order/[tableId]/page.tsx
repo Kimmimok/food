@@ -57,15 +57,11 @@ export default async function OrderQrPage({ params }: any) {
       {/* Cart and submit form - Fixed bottom */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
         <div className="max-w-screen-sm mx-auto p-4">
-          <form data-cart-form="true" data-table-id={tableId} action={async (formData: FormData) => {
-            'use server'
-            const raw = String(formData.get('cart') || '[]')
-            let parsed = []
-            try { parsed = JSON.parse(raw) } catch {}
-            await import('../actions').then(m=>m.addMultipleToTableOrder({ tableId, items: parsed }))
-          }} className="space-y-4">
-            {/* Client-side cart renders and CartClientScript syncs hidden input */}
-            <ClientCart initialItems={[]} tableId={tableId} />
+          <form data-cart-form="true" data-table-id={tableId} className="space-y-4">
+            {/* Client-side cart renders and CartClientScript syncs hidden input - Hidden for cleaner UI */}
+            <div className="hidden">
+              <ClientCart initialItems={[]} tableId={tableId} />
+            </div>
             <input type="hidden" name="cart" value="[]" />
 
             {/* Action Buttons */}
@@ -74,11 +70,17 @@ export default async function OrderQrPage({ params }: any) {
                 type="button"
                 data-action="toggle-order-history"
                 className="flex-1 py-4 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-95 text-base border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={false} // 장바구니 상태에 따라 활성화/비활성화할 수 있음
+                disabled={false}
               >
-                📋 주문내역
+                📋 주문내역 <span id="cart-count" className="text-xs bg-blue-500 text-white px-2 py-1 rounded-full ml-2 hidden">0</span>
               </button>
-              <button type="submit" disabled className="flex-1 py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-95">
+              <button
+                type="button"
+                id="order-submit-btn"
+                data-action="submit-order"
+                disabled
+                className="flex-1 py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 🛒 주문하기
               </button>
             </div>

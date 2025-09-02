@@ -24,49 +24,40 @@ export default function CartClientScript() {
       if (hidden) hidden.value = JSON.stringify(cart)
     }
 
-    async function submitCart(e: Event) {
-      e.preventDefault()
-      const form = e.target as HTMLFormElement
-      // find submit button
-      const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null
-      if (submitted) return
-      submitted = true
-      if (submitBtn) {
-        (submitBtn as HTMLButtonElement).disabled = true
-        submitBtn.dataset.prevText = submitBtn.innerHTML
-        submitBtn.innerHTML = '주문완료'
-        submitBtn.setAttribute('aria-disabled', 'true')
-      }
+  async function submitCart(e: Event) {
+    e.preventDefault()
+    const form = e.target as HTMLFormElement
+    // find submit button
+    const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null
+    if (submitted) return
+    submitted = true
+    if (submitBtn) {
+      (submitBtn as HTMLButtonElement).disabled = true
+      submitBtn.dataset.prevText = submitBtn.innerHTML
+      submitBtn.innerHTML = '주문완료'
+      submitBtn.setAttribute('aria-disabled', 'true')
+    }
 
-      const hidden = form.querySelector('input[name="cart"]') as HTMLInputElement | null
-      const raw = hidden?.value || '[]'
-      let parsed = []
-      try { parsed = JSON.parse(raw) } catch {}
-      try {
-        const res = await fetch('/api/order/multi', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: parsed, tableId: form.getAttribute('data-table-id') })
-        })
-        if (res.ok) {
-          window.dispatchEvent(new CustomEvent('notify', { detail: { message: '주문이 접수되었습니다', type: 'success' } }))
-          // clear cart
-          cart.length = 0
-          sync()
-          window.dispatchEvent(new CustomEvent('cart:update', { detail: cart }))
-          // keep button disabled and labeled '주문완료' to avoid duplicates
-        } else {
-          const txt = await res.text()
-          window.dispatchEvent(new CustomEvent('notify', { detail: { message: '주문 실패: '+txt, type: 'error' } }))
-          // restore button
-          submitted = false
-          if (submitBtn) {
-            submitBtn.disabled = false
-            submitBtn.innerHTML = submitBtn.dataset.prevText || '주문하기'
-            submitBtn.removeAttribute('aria-disabled')
-          }
-        }
-      } catch (err:any) {
-        window.dispatchEvent(new CustomEvent('notify', { detail: { message: '네트워크 오류', type: 'error' } }))
+    const hidden = form.querySelector('input[name="cart"]') as HTMLInputElement | null
+    const raw = hidden?.value || '[]'
+    let parsed = []
+    try { parsed = JSON.parse(raw) } catch {}
+    try {
+      const res = await fetch('/api/order/multi', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: parsed, tableId: form.getAttribute('data-table-id') })
+      })
+      if (res.ok) {
+        window.dispatchEvent(new CustomEvent('notify', { detail: { message: '주문이 접수되었습니다', type: 'success' } }))
+        // clear cart
+        cart.length = 0
+        sync()
+        window.dispatchEvent(new CustomEvent('cart:update', { detail: cart }))
+        // keep button disabled and labeled '주문완료' to avoid duplicates
+      } else {
+        const txt = await res.text()
+        window.dispatchEvent(new CustomEvent('notify', { detail: { message: '주문 실패: '+txt, type: 'error' } }))
+        // restore button
         submitted = false
         if (submitBtn) {
           submitBtn.disabled = false
@@ -74,9 +65,70 @@ export default function CartClientScript() {
           submitBtn.removeAttribute('aria-disabled')
         }
       }
+    } catch (err:any) {
+      window.dispatchEvent(new CustomEvent('notify', { detail: { message: '네트워크 오류', type: 'error' } }))
+      submitted = false
+      if (submitBtn) {
+        submitBtn.disabled = false
+        submitBtn.innerHTML = submitBtn.dataset.prevText || '주문하기'
+        submitBtn.removeAttribute('aria-disabled')
+      }
+    }
+  }
+
+  async function handleOrderSubmit() {
+    if (submitted) return
+    submitted = true
+
+    const submitBtn = document.getElementById('order-submit-btn') as HTMLButtonElement | null
+    if (submitBtn) {
+      submitBtn.disabled = true
+      submitBtn.innerHTML = '⏳ 주문 처리중...'
     }
 
-  function onClick(e: Event) {
+    const hidden = document.querySelector('input[name="cart"]') as HTMLInputElement | null
+    const form = document.querySelector('form[data-cart-form="true"]') as HTMLFormElement | null
+    const raw = hidden?.value || '[]'
+    let parsed = []
+    try { parsed = JSON.parse(raw) } catch {}
+
+    try {
+      const res = await fetch('/api/order/multi', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: parsed, tableId: form?.getAttribute('data-table-id') })
+      })
+      if (res.ok) {
+        window.dispatchEvent(new CustomEvent('notify', { detail: { message: '주문이 접수되었습니다', type: 'success' } }))
+        // clear cart
+        cart.length = 0
+        sync()
+        window.dispatchEvent(new CustomEvent('cart:update', { detail: cart }))
+        // keep button disabled and labeled '주문완료'
+        if (submitBtn) {
+          submitBtn.innerHTML = '✅ 주문완료'
+          submitBtn.setAttribute('aria-disabled', 'true')
+        }
+      } else {
+        const txt = await res.text()
+        window.dispatchEvent(new CustomEvent('notify', { detail: { message: '주문 실패: '+txt, type: 'error' } }))
+        // restore button
+        submitted = false
+        if (submitBtn) {
+          submitBtn.disabled = false
+          submitBtn.innerHTML = '🛒 주문하기'
+          submitBtn.removeAttribute('aria-disabled')
+        }
+      }
+    } catch (err:any) {
+      window.dispatchEvent(new CustomEvent('notify', { detail: { message: '네트워크 오류', type: 'error' } }))
+      submitted = false
+      if (submitBtn) {
+        submitBtn.disabled = false
+        submitBtn.innerHTML = '🛒 주문하기'
+        submitBtn.removeAttribute('aria-disabled')
+      }
+    }
+  }  function onClick(e: Event) {
       const t = e.target as HTMLElement
       const btn = t.closest('.add-to-cart') as HTMLElement | null
       if (btn) {
@@ -95,6 +147,13 @@ export default function CartClientScript() {
         window.dispatchEvent(event)
         return
       }
+
+      // Handle order submit button
+      const submitBtn = t.closest('[data-action="submit-order"]') as HTMLElement | null
+      if (submitBtn) {
+        handleOrderSubmit()
+        return
+      }
     }
 
     document.addEventListener('click', onClick)
@@ -107,19 +166,34 @@ export default function CartClientScript() {
     // helper to toggle submit button state on cart updates
     function updateSubmitButtonState(itemsList: any[]) {
       if (!form) return
-      const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null
+      const submitBtn = document.getElementById('order-submit-btn') as HTMLButtonElement | null
       if (!submitBtn) return
       if (submitted) {
         submitBtn.disabled = true
-        submitBtn.innerHTML = '주문완료'
+        submitBtn.innerHTML = '✅ 주문완료'
         submitBtn.setAttribute('aria-disabled', 'true')
         return
       }
       const hasItems = Array.isArray(itemsList) && itemsList.length > 0
       submitBtn.disabled = !hasItems
-      submitBtn.innerHTML = '주문하기'
+      submitBtn.innerHTML = '🛒 주문하기'
       if (!hasItems) submitBtn.setAttribute('aria-disabled', 'true')
       else submitBtn.removeAttribute('aria-disabled')
+    }
+
+    // helper to update order history button count
+    function updateOrderHistoryButton(itemsList: any[]) {
+      const cartCount = document.getElementById('cart-count')
+      if (!cartCount) return
+
+      const totalItems = Array.isArray(itemsList) ? itemsList.reduce((sum, item) => sum + (item.qty || 0), 0) : 0
+
+      if (totalItems > 0) {
+        cartCount.textContent = totalItems.toString()
+        cartCount.classList.remove('hidden')
+      } else {
+        cartCount.classList.add('hidden')
+      }
     }
 
     if (form) form.addEventListener('submit', submitCart)
@@ -127,8 +201,13 @@ export default function CartClientScript() {
     // Listen to cart updates to enable/disable submit button
     function onUpdateForButton(e:any) {
       updateSubmitButtonState(Array.isArray(e.detail) ? e.detail : [])
+      updateOrderHistoryButton(Array.isArray(e.detail) ? e.detail : [])
     }
     window.addEventListener('cart:update', onUpdateForButton as EventListener)
+
+    // Initialize button states
+    updateSubmitButtonState([])
+    updateOrderHistoryButton([])
 
     return () => {
       document.removeEventListener('click', onClick)

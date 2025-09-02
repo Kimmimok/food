@@ -3,7 +3,7 @@ import { supabaseServer } from '../../lib/supabase-server'
 
 const STATIONS = [
 	{ id: 'main', name: '메인 키친', desc: '메인 요리 및 밥류', icon: '🍳' },
-	{ id: 'bar', name: '바', desc: '음료 및 주류', icon: '🥤' },
+	{ id: 'beverages', name: '음료/주류', desc: '음료 및 주류 준비', icon: '🥤' },
 	{ id: 'dessert', name: '디저트', desc: '후식 및 커피', icon: '🍰' },
 ]
 import { requireRole } from '../../lib/auth'
@@ -21,7 +21,7 @@ export default async function KitchenHome() {
 		`)
 		.order('created_at', { ascending: false })
 
-	let stationCounts: Record<string, number> = { main: 0, bar: 0, dessert: 0 }
+	let stationCounts: Record<string, number> = { main: 0, beverages: 0, dessert: 0 }
 	const totals = { queued: 0, in_progress: 0, done: 0 }
 	let recent: any[] = []
 	let tableLabelMap: Record<string,string> = {}
@@ -32,7 +32,9 @@ export default async function KitchenHome() {
 			// normalize order_item (select may return array)
 			const oi = Array.isArray(r.order_item) ? r.order_item[0] : r.order_item
 			const st = oi?.status ?? r.status
-			if (st === 'queued') stationCounts[r.station] = (stationCounts[r.station]||0)+1
+			// beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+			const effectiveStation = r.station === 'bar' ? 'beverages' : r.station
+			if (st === 'queued') stationCounts[effectiveStation] = (stationCounts[effectiveStation]||0)+1
 			if (st in totals) (totals as any)[st]++
 		}
 		recent = (kq || []).slice(0,10)
@@ -57,7 +59,9 @@ export default async function KitchenHome() {
 			.order('created_at', { ascending: false })
 		for (const it of items || []) {
 			const st = (it as any).menu_item?.station || 'main'
-			if (it.status === 'queued') stationCounts[st] = (stationCounts[st]||0)+1
+			// beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+			const effectiveStation = st === 'bar' ? 'beverages' : st
+			if (it.status === 'queued') stationCounts[effectiveStation] = (stationCounts[effectiveStation]||0)+1
 			if (it.status in totals) (totals as any)[it.status]++
 		}
 		recent = (items || []).slice(0, 10).map((it: any) => ({

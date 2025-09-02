@@ -31,24 +31,40 @@ export default async function TablesPage() {
 						}
 			}
 
-			// fetch latest open order for the tables (if any)
-			const tableIds = tables.map((t: any) => t.id)
-			let ordersMap: Record<string, any> = {}
-				if (tableIds.length) {
-					const resp = await supabase
-						.from('order_ticket')
-						.select('id, table_id, status, created_at, items:order_item(name_snapshot, qty)')
-						.in('table_id', tableIds)
-						.in('status', ['open','sent_to_kitchen'])
-						.order('created_at', { ascending: false })
+			// fetch latest order for the tables (모든 상태 포함)
+			const resp = await supabase
+				.from('order_ticket')
+				.select('id, table_id, status, created_at, items:order_item(name_snapshot, qty)')
+				.in('table_id', tableIds)
+				.in('status', ['open', 'sent_to_kitchen', 'completed', 'paid'])
+				.order('created_at', { ascending: false })
 
-					const orders = Array.isArray(resp.data) ? resp.data : []
+			const orders = Array.isArray(resp.data) ? resp.data : []
 
-					// map to latest per table
-					for (const o of orders) {
-						if (!ordersMap[o.table_id]) ordersMap[o.table_id] = { id: o.id, status: o.status, created_at: o.created_at, items: o.items ?? [] }
+			// map to latest per table (오픈된 주문 우선, 없으면 최근 완료된 주문)
+			for (const o of orders) {
+				if (!ordersMap[o.table_id]) {
+					// 오픈된 주문이 있으면 그것을 사용
+					if (o.status === 'open' || o.status === 'sent_to_kitchen') {
+						ordersMap[o.table_id] = { id: o.id, status: o.status, created_at: o.created_at, items: o.items ?? [] }
+					}
+					// 오픈된 주문이 없으면 최근 완료된 주문을 표시 (시간 초기화 확인용)
+					else if (o.status === 'completed' || o.status === 'paid') {
+						ordersMap[o.table_id] = { id: o.id, status: o.status, created_at: o.created_at, items: o.items ?? [] }
+					}
+				} else {
+					// 이미 오픈된 주문이 매핑되어 있으면 오픈된 주문만 유지
+					const existing = ordersMap[o.table_id]
+					if (existing.status === 'open' || existing.status === 'sent_to_kitchen') {
+						continue
+					}
+					// 기존이 완료된 주문이면 더 최근의 완료된 주문으로 교체
+					if ((o.status === 'completed' || o.status === 'paid') &&
+						new Date(o.created_at) > new Date(existing.created_at)) {
+						ordersMap[o.table_id] = { id: o.id, status: o.status, created_at: o.created_at, items: o.items ?? [] }
 					}
 				}
+			}
 
 	const statusStats = tables.reduce((acc, table) => {
 		acc[table.status] = (acc[table.status] || 0) + 1;

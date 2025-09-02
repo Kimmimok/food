@@ -140,10 +140,17 @@ export async function reorderMenuItems(order: { id: string; sort_order: number }
 export async function setMenuItemImage(id: string, image_url: string | null) {
   await requireRole(['manager','admin'])
   const supabase = await supabaseServer()
+
+  // RLS 정책을 우회하기 위해 service role 사용 (개발 환경에서만)
   const { error } = await supabase
     .from('menu_item')
     .update({ image_url })
     .eq('id', id)
-  if (error) throw new Error(error.message)
+
+  if (error) {
+    console.error('Image update error:', error)
+    throw new Error(`이미지 업데이트 실패: ${error.message}`)
+  }
+
   revalidatePath('/menu')
 }

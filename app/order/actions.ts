@@ -40,17 +40,39 @@ export async function getOrCreateOpenOrder(tableId: string, channel: 'qr' | 'din
   }
 
   // Search for existing open order for the resolved table UUID
-  const { data: open, error: e1 } = await supabase
+  // 주문시간 초기화를 위해 completed/paid 상태의 주문이 있으면 새로운 주문을 생성
+  const { data: recentOrders, error: e1 } = await supabase
     .from('order_ticket')
     .select('*')
     .eq('table_id', tableUuid)
-    .in('status', ['open', 'sent_to_kitchen'])
+    .in('status', ['open', 'sent_to_kitchen', 'completed', 'paid'])
     .order('created_at', { ascending: false })
     .limit(1)
   if (e1) throw new Error(e1.message)
 
-  if (open && open.length > 0) return open[0]
+  // 최근 주문이 있고, 그 주문이 완료된 상태라면 새로운 주문을 생성
+  if (recentOrders && recentOrders.length > 0) {
+    const latestOrder = recentOrders[0]
+    if (latestOrder.status === 'completed' || latestOrder.status === 'paid') {
+      // 완료된 주문이 있으면 새로운 주문을 생성
+      const { data, error: e2 } = await supabase
+        .from('order_ticket')
+        .insert({ table_id: tableUuid, status: 'open', channel })
+        .select('*')
+        .single()
+      if (e2) throw new Error(e2.message)
 
+      // 테이블 상태도 사용중으로 전환
+      if (tableUuid) await supabase.from('dining_table').update({ status: 'seated' }).eq('id', tableUuid)
+
+      return data
+    } else if (latestOrder.status === 'open' || latestOrder.status === 'sent_to_kitchen') {
+      // 진행중인 주문이 있으면 기존 주문 반환
+      return latestOrder
+    }
+  }
+
+  // 오픈된 주문이 없으면 새로 생성
   const { data, error: e2 } = await supabase
     .from('order_ticket')
     .insert({ table_id: tableUuid, status: 'open', channel })
@@ -94,15 +116,26 @@ export async function addToTableOrder(params: { tableId: string; menuItemId: str
 
   // enqueue to kitchen_queue based on menu_item.station
   try {
-    const station = (mi as any)?.station || 'main'
-    if (inserted?.id) {
-      // idempotent insert: only insert if not exists
-      const { data: exists } = await supabase.from('kitchen_queue').select('id').eq('order_item_id', inserted.id).maybeSingle()
-      if (!exists) {
-        const { error: qe } = await supabase
-          .from('kitchen_queue')
-          .insert({ order_item_id: inserted.id, station, status: 'queued' })
-        if (qe) console.error('enqueue kitchen failed', qe.message)
+    let station = (mi as any)?.station || 'main'
+    // bar 스테이션은 beverages로 변경
+    station = station === 'bar' ? 'beverages' : station
+
+    // 음료/주류 메뉴(바 스테이션)는 kitchen_queue에 넣지 않고 바로 서빙 준비 상태로 설정
+    if (station === 'beverages') {
+      await supabase
+        .from('order_item')
+        .update({ status: 'done' })
+        .eq('id', inserted.id)
+    } else {
+      if (inserted?.id) {
+        // idempotent insert: only insert if not exists
+        const { data: exists } = await supabase.from('kitchen_queue').select('id').eq('order_item_id', inserted.id).maybeSingle()
+        if (!exists) {
+          const { error: qe } = await supabase
+            .from('kitchen_queue')
+            .insert({ order_item_id: inserted.id, station, status: 'queued' })
+          if (qe) console.error('enqueue kitchen failed', qe.message)
+        }
       }
     }
   } catch (err) {
@@ -122,6 +155,7 @@ export async function addToTableOrder(params: { tableId: string; menuItemId: str
 }
 
 export async function addMultipleToTableOrder(params: { tableId: string; items: Array<{ menuItemId: string; qty: number; note?: string }> }) {
+  console.log('addMultipleToTableOrder called with:', params)
   const supabase = await supabaseServer()
   const order = await getOrCreateOpenOrder(params.tableId, 'qr')
 
@@ -167,19 +201,39 @@ export async function addMultipleToTableOrder(params: { tableId: string; items: 
       .select('id, station')
       .in('id', ids)
     const stationMap: Record<string, string> = {}
-    for (const em of enrichedMenu) stationMap[em.id] = em.station || 'main'
+    for (const em of enrichedMenu) {
+      const station = em.station || 'main'
+      // bar 스테이션은 beverages로 변경
+      stationMap[em.id] = station === 'bar' ? 'beverages' : station
+    }
 
-    const qInserts = insertedItems.map((oi: any) => ({
-      order_item_id: oi.id,
-      station: stationMap[oi.menu_item_id] || 'main',
-      status: 'queued'
-    }))
-    if (qInserts.length) {
+    // 음료/주류 메뉴(바 스테이션)는 kitchen_queue에 넣지 않고 바로 서빙 준비 상태로 설정
+    const kitchenInserts = insertedItems
+      .filter((oi: any) => stationMap[oi.menu_item_id] !== 'beverages')
+      .map((oi: any) => ({
+        order_item_id: oi.id,
+        station: stationMap[oi.menu_item_id] || 'main',
+        status: 'queued'
+      }))
+
+    // 음료/주류 메뉴는 바로 done 상태로 설정 (서빙 준비 완료)
+    const beverageItems = insertedItems
+      .filter((oi: any) => stationMap[oi.menu_item_id] === 'beverages')
+      .map((oi: any) => oi.id)
+
+    if (beverageItems.length > 0) {
+      await supabase
+        .from('order_item')
+        .update({ status: 'done' })
+        .in('id', beverageItems)
+    }
+
+    if (kitchenInserts.length) {
       // use upsert-like logic: insert only those order_item_id not present
-      const ids = qInserts.map((q:any)=>q.order_item_id)
+      const ids = kitchenInserts.map((q:any)=>q.order_item_id)
       const { data: existing = [] } = await supabase.from('kitchen_queue').select('order_item_id').in('order_item_id', ids)
       const existingIds = new Set((existing||[]).map((e:any)=>e.order_item_id))
-      const toInsert = qInserts.filter((q:any)=>!existingIds.has(q.order_item_id))
+      const toInsert = kitchenInserts.filter((q:any)=>!existingIds.has(q.order_item_id))
       if (toInsert.length) {
         const { data: kdata, error: kerr } = await supabase.from('kitchen_queue').insert(toInsert).select('id, order_item_id, station, status')
         if (kerr) console.error('kitchen_queue insert error', kerr.message)

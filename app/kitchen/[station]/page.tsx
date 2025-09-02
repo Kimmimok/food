@@ -61,7 +61,11 @@ export default async function StationPage({ params }: { params: Promise<{ statio
       .order('created_at', { ascending: true })
 
     queue = (items || [])
-      .filter((it: any) => (it.menu_item?.station || 'main') === station)
+      .filter((it: any) => {
+        const itemStation = it.menu_item?.station || 'main'
+        // beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+        return itemStation === station || (station === 'beverages' && itemStation === 'bar')
+      })
       .map((it: any) => ({
         id: String(it.id),
         status: it.status,

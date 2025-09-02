@@ -8,7 +8,10 @@ export default function TableCard({ table, order }: { table: any; order?: any | 
   const [roundedMinutes, setRoundedMinutes] = useState<number>(0)
 
   useEffect(() => {
-    if (!order || !order.created_at) return
+    if (!order || !order.created_at || order.status === 'completed' || order.status === 'paid') {
+      setRoundedMinutes(0)
+      return
+    }
     let mounted = true
     const created = new Date(order.created_at).getTime()
 
@@ -42,10 +45,10 @@ export default function TableCard({ table, order }: { table: any; order?: any | 
       const iv = (window as any).__tablecard_iv
       if (iv) clearInterval(iv)
     }
-  }, [order?.created_at])
+  }, [order?.created_at, order?.status])
 
   return (
-    <div className="rounded-lg border-2 p-4 flex flex-col bg-white">
+    <div className={`rounded-lg border-2 p-4 flex flex-col bg-white ${getOrderStatusStyle(order?.status)}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="font-bold text-lg">{table.label}</div>
         <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusBadgeStyle(table.status)}`}>
@@ -58,7 +61,11 @@ export default function TableCard({ table, order }: { table: any; order?: any | 
       {order ? (
         <div className="text-sm text-gray-700 space-y-2">
           <div>주문시간: {new Date(order.created_at).toLocaleString()}</div>
-          <div>식사시간(10분 단위): {roundedMinutes}분</div>
+          {order.status === 'completed' || order.status === 'paid' ? (
+            <div className="text-green-600 font-medium">식사 완료됨</div>
+          ) : (
+            <div>식사시간(10분 단위): {roundedMinutes}분</div>
+          )}
           <div className="pt-2">
             <div className="text-xs text-gray-500">주문메뉴</div>
             <ul className="mt-1 text-sm list-disc list-inside">
@@ -88,6 +95,20 @@ function getStatusBadgeStyle(status: string) {
     case 'dirty': return 'bg-yellow-100 text-yellow-800'
     case 'reserved': return 'bg-blue-100 text-blue-800'
     default: return 'bg-gray-100 text-gray-800'
+  }
+}
+
+function getOrderStatusStyle(status?: string) {
+  switch (status) {
+    case 'completed':
+    case 'paid':
+      return 'border-green-300 bg-green-50'
+    case 'sent_to_kitchen':
+      return 'border-blue-300 bg-blue-50'
+    case 'open':
+      return 'border-yellow-300 bg-yellow-50'
+    default:
+      return 'border-gray-300 bg-white'
   }
 }
 

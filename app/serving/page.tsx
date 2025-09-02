@@ -5,7 +5,7 @@ import { requireRole } from '../../lib/auth'
 
 const STATIONS = [
 	{ id: 'main', name: '메인 키친', desc: '메인 요리 및 밥류', icon: '🍳' },
-	{ id: 'bar', name: '바', desc: '음료 및 주류', icon: '🥤' },
+	{ id: 'beverages', name: '음료/주류', desc: '음료 및 주류 서빙', icon: '🥤' },
 	{ id: 'dessert', name: '디저트', desc: '후식 및 커피', icon: '🍰' },
 ]
 
@@ -23,14 +23,16 @@ export default async function ServingHome() {
 		.eq('status', 'done')
 		.order('done_at', { ascending: false })
 
-	let stationCounts: Record<string, number> = { main: 0, bar: 0, dessert: 0 }
+	let stationCounts: Record<string, number> = { main: 0, beverages: 0, dessert: 0 }
 	let recent: any[] = []
 	let tableLabelMap: Record<string,string> = {}
 
 	if ((kq || []).length > 0) {
 		// Count completed items by station
 		for (const r of (kq || [])) {
-			stationCounts[r.station] = (stationCounts[r.station]||0)+1
+			// beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+			const effectiveStation = r.station === 'bar' ? 'beverages' : r.station
+			stationCounts[effectiveStation] = (stationCounts[effectiveStation]||0)+1
 		}
 		recent = (kq || []).slice(0,10)
 		const tableIds = Array.from(new Set(recent.map((q:any)=>q.order_item?.order_ticket?.table_id).filter(Boolean)))
@@ -56,7 +58,9 @@ export default async function ServingHome() {
 
 		for (const it of items || []) {
 			const st = (it as any).menu_item?.station || 'main'
-			stationCounts[st] = (stationCounts[st]||0)+1
+			// beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+			const effectiveStation = st === 'bar' ? 'beverages' : st
+			stationCounts[effectiveStation] = (stationCounts[effectiveStation]||0)+1
 		}
 		recent = (items || []).slice(0, 10).map((it: any) => ({
 			id: it.id,

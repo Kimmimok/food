@@ -35,7 +35,57 @@ function CategoryTabs({ categories, activeCategory, onCategoryChange }: any) {
   )
 }
 
-function OrderHistoryModal({ cart, isOpen, onClose }: { cart: any[], isOpen: boolean, onClose: () => void }) {
+function OrderHistoryModal({ cart, isOpen, onClose, tableId }: { cart: any[], isOpen: boolean, onClose: () => void, tableId: string }) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [isCompleted, setIsCompleted] = React.useState(false)
+
+  const handleOrder = async () => {
+    if (isSubmitting || isCompleted || cart.length === 0) return
+
+    console.log('OrderHistoryModal handleOrder:', { tableId, cart })
+
+    // tableId가 undefined인 경우 처리
+    if (!tableId) {
+      alert('테이블 정보가 없습니다. 페이지를 새로고침해주세요.')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      // cart 아이템 구조 변환: {id, quantity} -> {menuItemId, qty}
+      const transformedItems = cart.map(item => ({
+        menuItemId: item.id,
+        qty: item.quantity
+      }))
+
+      console.log('Transformed items:', transformedItems)
+
+      const response = await fetch('/api/order/multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: transformedItems, tableId })
+      })
+
+      if (response.ok) {
+        setIsCompleted(true)
+        // 장바구니 비우기
+        window.dispatchEvent(new CustomEvent('cart:update', { detail: [] }))
+        // 성공 메시지
+        alert('주문이 접수되었습니다!')
+        onClose()
+      } else {
+        const errorText = await response.text()
+        console.error('Order failed:', errorText)
+        alert('주문 실패: ' + errorText)
+      }
+    } catch (error) {
+      console.error('Network error:', error)
+      alert('네트워크 오류가 발생했습니다.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   if (!isOpen) return null
 
   return (
@@ -47,6 +97,7 @@ function OrderHistoryModal({ cart, isOpen, onClose }: { cart: any[], isOpen: boo
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 p-1"
+              disabled={isSubmitting}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -88,6 +139,24 @@ function OrderHistoryModal({ cart, isOpen, onClose }: { cart: any[], isOpen: boo
             </div>
           )}
         </div>
+
+        {cart.length > 0 && (
+          <div className="p-4 border-t border-gray-200">
+            <button
+              onClick={handleOrder}
+              disabled={isSubmitting || isCompleted}
+              className={`w-full py-4 px-6 text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 ${
+                isCompleted
+                  ? 'bg-green-600 text-white cursor-not-allowed'
+                  : isSubmitting
+                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white active:scale-95'
+              }`}
+            >
+              {isCompleted ? '✅ 주문완료' : isSubmitting ? '⏳ 주문 처리중...' : '🛒 주문하기'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -118,6 +187,7 @@ export default function ClientOrderPanel({ tableId, categories, items }: any) {
         cart={cart}
         isOpen={showOrderHistory}
         onClose={() => setShowOrderHistory(false)}
+        tableId={tableId}
       />
     </>
   )
