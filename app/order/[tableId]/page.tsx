@@ -56,7 +56,7 @@ export default async function OrderQrPage({ params }: any) {
       {/* Cart and submit form - Fixed bottom */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
         <div className="max-w-screen-sm mx-auto p-4">
-          <form action={async (formData: FormData) => {
+          <form data-cart-form="true" data-table-id={tableId} action={async (formData: FormData) => {
             'use server'
             const raw = String(formData.get('cart') || '[]')
             let parsed = []
@@ -66,7 +66,7 @@ export default async function OrderQrPage({ params }: any) {
             {/* Client-side cart renders and CartClientScript syncs hidden input */}
             <ClientCart initialItems={[]} tableId={tableId} />
             <input type="hidden" name="cart" value="[]" />
-            <button type="submit" className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-95">
+            <button type="submit" disabled className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-95">
               🛒 주문하기
             </button>
           </form>
