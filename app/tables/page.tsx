@@ -4,6 +4,7 @@ import { supabaseServer } from '@/lib/supabase-server'
 import Link from 'next/link'
 import TableCard from '@/components/TableCard'
 import { seatTableAndOpenOrder, markTableEmpty } from './actions'
+import { RealtimeSync } from '@/components/RealtimeSync'
 
  
 
@@ -75,6 +76,7 @@ export default async function TablesPage() {
 
 	return (
 		<div className="space-y-6">
+			<RealtimeSync />
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-bold text-gray-900">테이블 관리</h1>

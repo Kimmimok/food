@@ -2,6 +2,8 @@
 import Link from 'next/link'
 import { supabaseServer } from '../../lib/supabase-server'
 import { requireRole } from '../../lib/auth'
+import { RefreshButton } from '@/components/RefreshButton'
+import { RealtimeSync } from '../../components/RealtimeSync'
 
 const STATIONS = [
 	{ id: 'main', name: '메인 키친', desc: '메인 요리 및 밥류', icon: '🍳' },
@@ -19,6 +21,42 @@ export default async function ServingHome() {
 	let queryError = null
 
 	try {
+		// 먼저 order_item에서 완료된 항목들을 확인
+		const { data: orderItems, error: oiError } = await supabase
+			.from('order_item')
+			.select('id, status, name_snapshot, qty, menu_item_id')
+			.eq('status', 'done')
+			.limit(5)
+
+		console.log('Debug - Order items with status done:', orderItems)
+		console.log('Debug - Order items error:', oiError)
+
+		// kitchen_queue에서도 확인
+		const { data: kitchenQueue, error: kqError } = await supabase
+			.from('kitchen_queue')
+			.select('id, status, order_item_id, station')
+			.eq('status', 'done')
+			.limit(5)
+
+		console.log('Debug - Kitchen queue with status done:', kitchenQueue)
+		console.log('Debug - Kitchen queue error:', kqError)
+
+		// kitchen_queue에서 완료된 항목들을 order_item과 join해서 가져오기
+		const { data: kqData, error: kqMainError } = await supabase
+			.from('kitchen_queue')
+			.select(`
+				id, status, station,
+				order_item:order_item_id (
+					id, status, name_snapshot, qty, menu_item_id,
+					menu_item:menu_item_id (id, station),
+					order_ticket:order_id (id, created_at, table_id)
+				)
+			`)
+			.eq('status', 'done')
+
+		console.log('Debug - Kitchen queue with join:', kqData?.length || 0, 'items')
+		console.log('Debug - Kitchen queue join error:', kqMainError)
+
 		const { data, error } = await supabase
 			.from('order_item')
 			.select(`
@@ -26,6 +64,9 @@ export default async function ServingHome() {
 				name_snapshot, qty,
 				order_id,
 				menu_item_id,
+				menu_item:menu_item_id (
+					id, station
+				),
 				order_ticket:order_id (
 					id, created_at, table_id
 				)
@@ -42,8 +83,26 @@ export default async function ServingHome() {
 			})
 			queryError = error
 		} else {
+			console.log('Serving page - query successful, data length:', data?.length || 0)
+			// kitchen_queue 데이터도 함께 고려
+			let allItems = [...(data || [])]
+
+			if (kqData && kqData.length > 0) {
+				for (const kq of kqData) {
+					const oi = kq.order_item
+					if (oi && oi.status === 'done') {
+						// 중복 방지를 위해 이미 있는 항목인지 확인
+						const exists = allItems.find(item => item.id === oi.id)
+						if (!exists) {
+							allItems.push(oi)
+							console.log('Added item from kitchen_queue:', oi.id, oi.name_snapshot)
+						}
+					}
+				}
+			}
+
 			// 데이터를 created_at 기준으로 정렬
-			items = (data || []).sort((a, b) => {
+			items = allItems.sort((a, b) => {
 				const aTime = a.order_ticket?.created_at ? new Date(a.order_ticket.created_at).getTime() : 0
 				const bTime = b.order_ticket?.created_at ? new Date(b.order_ticket.created_at).getTime() : 0
 				return bTime - aTime // 최신순
@@ -106,29 +165,16 @@ export default async function ServingHome() {
 
 	// order_item에서 완료된 항목들로 station 카운트 계산
 	for (const it of safeItems) {
-		// menu_item_id로 메뉴 정보를 가져와서 station 확인
-		if (it.menu_item_id) {
-			try {
-				const { data: menuItem, error: menuError } = await supabase
-					.from('menu_item')
-					.select('station')
-					.eq('id', it.menu_item_id)
-					.maybeSingle()
-
-				if (menuError) {
-					console.warn(`Menu item ${it.menu_item_id} query error:`, menuError)
-					stationCounts.main = (stationCounts.main || 0) + 1
-				} else {
-					const st = menuItem?.station || 'main'
-					// beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
-					const effectiveStation = st === 'bar' ? 'beverages' : st
-					stationCounts[effectiveStation] = (stationCounts[effectiveStation] || 0) + 1
-				}
-			} catch (err) {
-				console.warn(`Failed to get menu item ${it.menu_item_id}:`, err)
-				stationCounts.main = (stationCounts.main || 0) + 1
-			}
+		// 이미 join으로 menu_item 정보를 가져왔으므로 직접 사용
+		const menuItem = it.menu_item
+		if (menuItem && menuItem.station) {
+			const st = menuItem.station
+			// beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+			const effectiveStation = st === 'bar' ? 'beverages' : st
+			stationCounts[effectiveStation] = (stationCounts[effectiveStation] || 0) + 1
 		} else {
+			// menu_item 정보가 없는 경우 main으로 처리
+			console.warn(`Menu item not found for order_item ${it.id}, assigning to main station`)
 			stationCounts.main = (stationCounts.main || 0) + 1
 		}
 	}
@@ -184,6 +230,11 @@ export default async function ServingHome() {
 					<p className="text-gray-600 mt-1">완료된 식사들을 서빙하고 관리하세요</p>
 				</div>
 				<div className="flex items-center space-x-3">
+					<RefreshButton
+						className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium text-sm"
+					>
+						새로고침
+					</RefreshButton>
 					<div className="text-sm text-gray-500">
 						서빙 준비 완료
 					</div>

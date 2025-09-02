@@ -18,11 +18,12 @@ type KQueue = {
   } | null
 }
 
-export default function KitchenCard({ q, tableLabelMap }: { q: KQueue, tableLabelMap: Record<string,string> }) {
+export default function KitchenCard({ q, tableLabelMap, station }: { q: KQueue, tableLabelMap: Record<string,string>, station?: string }) {
   const [loadingInProgress, setLoadingInProgress] = useState(false)
   const [loadingDone, setLoadingDone] = useState(false)
   const [loadingServed, setLoadingServed] = useState(false)
   const tableLabel = q.order_item?.order_ticket?.table_id ? (tableLabelMap[q.order_item.order_ticket.table_id] ?? '') : ''
+  const isMain = station === 'main'
 
   const toInProgress = async () => {
     const id = q.order_item?.id
@@ -71,19 +72,19 @@ export default function KitchenCard({ q, tableLabelMap }: { q: KQueue, tableLabe
   }
 
   return (
-    <div className="border-2 border-gray-300 rounded-lg p-4 bg-white shadow-sm min-h-[120px]">
-      <div className="flex items-center justify-between gap-3">
+    <div className={`border-2 border-gray-300 rounded-lg ${isMain ? 'p-4' : 'p-3'} bg-white shadow-sm ${isMain ? 'min-h-[120px]' : 'min-h-[100px]'}`}>
+      <div className={`flex items-center justify-between ${isMain ? 'gap-3' : 'gap-2'}`}>
         <div className="flex-1">
-          <div className="font-semibold text-lg">{q.order_item?.name_snapshot} × {q.order_item?.qty}</div>
-          {tableLabel && <div className="text-sm opacity-70 mt-1">테이블 {tableLabel}</div>}
+          <div className={`font-semibold ${isMain ? 'text-lg' : 'text-base'}`}>{q.order_item?.name_snapshot} × {q.order_item?.qty}</div>
+          {tableLabel && <div className={`${isMain ? 'text-sm' : 'text-xs'} opacity-70 mt-1`}>테이블 {tableLabel}</div>}
         </div>
-        <span className="text-sm border rounded-full px-3 py-1 bg-gray-100">{badge(q.status)}</span>
+        <span className={`${isMain ? 'text-sm' : 'text-xs'} border rounded-full ${isMain ? 'px-3 py-1' : 'px-2 py-1'} bg-gray-100`}>{badge(q.status)}</span>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-3">
-        <button onClick={toInProgress} disabled={q.status!=='queued' || loadingInProgress} className="px-4 py-2 border-2 border-blue-500 rounded-lg text-sm font-medium bg-blue-50 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed">{loadingInProgress ? '처리중...' : '조리시작'}</button>
-        <button onClick={toDone} disabled={q.status!=='in_progress' || loadingDone} className="px-4 py-2 border-2 border-green-500 rounded-lg text-sm font-medium bg-green-50 hover:bg-green-100 disabled:opacity-40 disabled:cursor-not-allowed">{loadingDone ? '처리중...' : '완료'}</button>
-        <button onClick={toServed} disabled={q.status!=='done' || loadingServed} className="px-4 py-2 border-2 border-purple-500 rounded-lg text-sm font-medium bg-purple-50 hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed">{loadingServed ? '처리중...' : '서빙완료'}</button>
+      <div className={`${isMain ? 'mt-3' : 'mt-2'} grid grid-cols-3 ${isMain ? 'gap-3' : 'gap-2'}`}>
+        <button onClick={toInProgress} disabled={q.status!=='queued' || loadingInProgress} className={`${isMain ? 'px-4 py-2' : 'px-3 py-1.5'} border-2 border-blue-500 rounded-lg ${isMain ? 'text-sm' : 'text-xs'} font-medium bg-blue-50 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed`}>{loadingInProgress ? '처리중...' : '조리시작'}</button>
+        <button onClick={toDone} disabled={q.status!=='in_progress' || loadingDone} className={`${isMain ? 'px-4 py-2' : 'px-3 py-1.5'} border-2 border-green-500 rounded-lg ${isMain ? 'text-sm' : 'text-xs'} font-medium bg-green-50 hover:bg-green-100 disabled:opacity-40 disabled:cursor-not-allowed`}>{loadingDone ? '처리중...' : '완료'}</button>
+        <button onClick={toServed} disabled={q.status!=='done' || loadingServed} className={`${isMain ? 'px-4 py-2' : 'px-3 py-1.5'} border-2 border-purple-500 rounded-lg ${isMain ? 'text-sm' : 'text-xs'} font-medium bg-purple-50 hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed`}>{loadingServed ? '처리중...' : '서빙완료'}</button>
       </div>
     </div>
   )

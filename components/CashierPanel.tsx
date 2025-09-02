@@ -14,17 +14,20 @@ type Order = {
     id: string
     name_snapshot: string
     qty: number
-    price: number
+    price?: number
+    price_snapshot?: number
     status: string
     menu_item?: { name: string; price: number }
   }>
+  created_at?: string
 }
 
 export default function CashierPanel({ orders }: { orders: Order[] }) {
   const safeOrders = orders || []
   const [method, setMethod] = useState<'cash' | 'card'>('card')
   const [amount, setAmount] = useState('')
-  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
+  // 기본적으로 모든 주문의 세부 내역을 펼쳐서 표시합니다
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(() => new Set((orders || []).map((o: any) => o.id)))
 
   const toggleExpanded = (orderId: string) => {
     const newExpanded = new Set(expandedOrders)
@@ -47,13 +50,15 @@ export default function CashierPanel({ orders }: { orders: Order[] }) {
   }
 
   return (
-    <div className="space-y-4">
-      {safeOrders.map(o => {
+    <div>
+      {safeOrders.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {safeOrders.map(o => {
         const isExpanded = expandedOrders.has(o.id)
         const totalAmount = o.total ?? 0
         
         return (
-          <div key={o.id} className="border rounded-xl p-4 bg-white">
+            <div key={o.id} className="border rounded-xl p-4 bg-white">
             <div className="flex justify-between items-start mb-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -84,18 +89,21 @@ export default function CashierPanel({ orders }: { orders: Order[] }) {
             {isExpanded && o.order_item && o.order_item.length > 0 && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                 <div className="space-y-2">
-                  {o.order_item.map(item => (
-                    <div key={item.id} className="flex justify-between items-center text-sm">
-                      <div className="flex-1">
-                        <span className="font-medium">{item.name_snapshot}</span>
-                        <span className="text-gray-500 ml-2">× {item.qty}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-medium">₩ {(item.price * item.qty).toLocaleString()}</span>
-                        <span className="text-gray-500 ml-2">(₩ {item.price.toLocaleString()} × {item.qty})</span>
-                      </div>
-                    </div>
-                  ))}
+                    {o.order_item.map(item => {
+                      const unitPrice = item.price ?? item.price_snapshot ?? item.menu_item?.price ?? 0
+                      return (
+                        <div key={item.id} className="flex justify-between items-center text-sm">
+                          <div className="flex-1">
+                            <span className="font-medium">{item.name_snapshot}</span>
+                            <span className="text-gray-500 ml-2">× {item.qty}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-medium">₩ {(unitPrice * item.qty).toLocaleString()}</span>
+                            <span className="text-gray-500 ml-2">(₩ {unitPrice.toLocaleString()} × {item.qty})</span>
+                          </div>
+                        </div>
+                      )
+                    })}
                 </div>
                 <div className="border-t mt-3 pt-2 flex justify-between font-semibold">
                   <span>총 합계</span>
@@ -137,11 +145,11 @@ export default function CashierPanel({ orders }: { orders: Order[] }) {
                 결제 완료
               </button>
             </div>
-          </div>
-        )
-      })}
-
-      {safeOrders.length === 0 && (
+            </div>
+          )
+        })}
+        </div>
+      ) : (
         <div className="text-center py-8">
           <div className="text-gray-400 text-4xl mb-4">💳</div>
           <p className="text-gray-500">결제 대기중인 주문이 없습니다.</p>

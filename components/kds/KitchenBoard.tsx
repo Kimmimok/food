@@ -143,30 +143,32 @@ export default function KitchenBoard({
   }, [rows])
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Section title="접수" items={grouped.queued} tableLabelMap={tableLabelMap} />
-      <Section title="조리중" items={grouped.in_progress} tableLabelMap={tableLabelMap} />
-      <Section title="완료" items={grouped.done} tableLabelMap={tableLabelMap} />
+    <div className={`grid grid-cols-1 md:grid-cols-3 ${station === 'main' ? 'gap-6' : 'gap-4'}`}>
+      <Section title="접수" items={grouped.queued} tableLabelMap={tableLabelMap} station={station} />
+      <Section title="조리중" items={grouped.in_progress} tableLabelMap={tableLabelMap} station={station} />
+      <Section title="완료" items={grouped.done} tableLabelMap={tableLabelMap} station={station} />
     </div>
   )
 }
 
-function Section({ title, items, tableLabelMap }:{
+function Section({ title, items, tableLabelMap, station }:{
   title: string
   items: KQueue[]
   tableLabelMap: Record<string,string>
+  station: string
 }) {
+  const isMain = station === 'main'
   return (
-    <div className="rounded-xl border-2 border-gray-300 p-6 min-h-[300px] bg-gray-50">
-      <div className="font-bold text-xl mb-4 text-center">{title} ({items.length})</div>
-      <ul className="space-y-3">
+    <div className={`rounded-lg border-2 border-gray-300 ${isMain ? 'p-4' : 'p-3'} ${isMain ? 'min-h-[250px]' : 'min-h-[200px]'} bg-gray-50`}>
+      <div className={`font-bold ${isMain ? 'text-lg' : 'text-base'} ${isMain ? 'mb-3' : 'mb-2'} text-center`}>{title} ({items.length})</div>
+      <ul className={isMain ? 'space-y-2' : 'space-y-1'}>
         {items.map(q => (
           <li key={q.id}>
-            <KitchenCard q={q} tableLabelMap={tableLabelMap} />
+            <KitchenCard q={q} tableLabelMap={tableLabelMap} station={station} />
           </li>
         ))}
       </ul>
-      {items.length === 0 && <p className="text-lg opacity-60 text-center mt-8">없음</p>}
+      {items.length === 0 && <p className={`text-sm opacity-60 text-center ${isMain ? 'mt-6' : 'mt-4'}`}>없음</p>}
     </div>
   )
 }

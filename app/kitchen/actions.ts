@@ -43,7 +43,10 @@ export async function setKitchenStatus(orderItemId: string, next: KStatus) {
   // Ignore error if kitchen_queue row doesn't exist
   
   revalidatePath('/kitchen')
-  revalidatePath(`/kitchen/[station]`)
+  revalidatePath('/kitchen/[station]', 'page')
+  revalidatePath('/serving')
+  revalidatePath('/serving/[station]', 'page')
+  revalidatePath('/cashier')
 }
 
 /** 스테이션의 미완료 티켓을 일괄 완료 처리 */
@@ -68,6 +71,10 @@ export async function bulkMarkDone(station: string) {
   }
   revalidatePath(`/kitchen/${station}`)
   revalidatePath(`/serving/${station}`)
+  revalidatePath('/kitchen')
+  revalidatePath('/serving')
+  revalidatePath('/cashier')
+  revalidatePath('/tables')
 }
 
 /** 완료된 것을 서빙완료 처리 */
@@ -91,4 +98,8 @@ export async function bulkMarkServed(station: string) {
   }
   revalidatePath(`/kitchen/${station}`)
   revalidatePath(`/serving/${station}`)
+  revalidatePath('/kitchen')
+  revalidatePath('/serving')
+  revalidatePath('/cashier')
+  revalidatePath('/tables')
 }

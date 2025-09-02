@@ -69,6 +69,9 @@ export async function markTableEmpty(tableId: string) {
 
   revalidatePath('/tables')
   revalidatePath(`/tables/${tableId}`)
+  revalidatePath('/kitchen')
+  revalidatePath('/serving')
+  revalidatePath('/cashier')
 }
 
 /** 메뉴를 주문 항목으로 추가 */
@@ -126,6 +129,9 @@ export async function addOrderItem(params: {
 
   revalidatePath(`/tables`)
   revalidatePath(`/tables/[tableId]`)
+  revalidatePath('/kitchen')
+  revalidatePath('/serving')
+  revalidatePath('/cashier')
 }
 
 /** 항목을 KDS 큐에 올리기(선택적) */
