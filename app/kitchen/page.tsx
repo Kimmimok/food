@@ -1,14 +1,31 @@
 ﻿import Link from 'next/link'
+import { supabaseServer } from '../../lib/supabase-server'
 
 const STATIONS = [
 	{ id: 'main', name: '메인 키친', desc: '메인 요리 및 밥류', icon: '🍳' },
 	{ id: 'bar', name: '바', desc: '음료 및 주류', icon: '🥤' },
 	{ id: 'dessert', name: '디저트', desc: '후식 및 커피', icon: '🍰' },
 ]
-import { requireRole } from '@/lib/auth'
+import { requireRole } from '../../lib/auth'
 
 export default async function KitchenHome() {
 	await requireRole(['manager','admin'])
+	const supabase = await supabaseServer()
+
+	// per-station queued counts
+	const { data: perStation = [] } = await supabase
+		.from('kitchen_queue')
+		.select('station, status')
+
+	const stationCounts: Record<string, number> = { main: 0, bar: 0, dessert: 0 }
+	for (const r of perStation || []) if (r.status === 'queued') stationCounts[r.station] = (stationCounts[r.station]||0)+1
+
+	// global status counts
+	const totals = { queued: 0, in_progress: 0, done: 0 }
+	for (const r of perStation || []) {
+		if (r.status in totals) (totals as any)[r.status]++
+	}
+
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
@@ -39,7 +56,7 @@ export default async function KitchenHome() {
 						
 						<div className="flex items-center justify-between">
 							<div className="text-sm text-gray-500">
-								대기 주문: <span className="font-semibold text-orange-600">3건</span>
+								대기 주문: <span className="font-semibold text-orange-600">{stationCounts[s.id] ?? 0}건</span>
 							</div>
 							<Link 
 								className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium" 
@@ -57,19 +74,19 @@ export default async function KitchenHome() {
 				<h3 className="text-lg font-semibold text-gray-900 mb-4">전체 주방 현황</h3>
 				<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 					<div className="text-center p-4 bg-orange-50 rounded-lg">
-						<div className="text-2xl font-bold text-orange-600">8</div>
+						<div className="text-2xl font-bold text-orange-600">{totals.queued}</div>
 						<div className="text-sm text-gray-600">대기중</div>
 					</div>
 					<div className="text-center p-4 bg-blue-50 rounded-lg">
-						<div className="text-2xl font-bold text-blue-600">5</div>
+						<div className="text-2xl font-bold text-blue-600">{totals.in_progress}</div>
 						<div className="text-sm text-gray-600">준비중</div>
 					</div>
 					<div className="text-center p-4 bg-green-50 rounded-lg">
-						<div className="text-2xl font-bold text-green-600">12</div>
+						<div className="text-2xl font-bold text-green-600">{totals.done}</div>
 						<div className="text-sm text-gray-600">완료</div>
 					</div>
 					<div className="text-center p-4 bg-purple-50 rounded-lg">
-						<div className="text-2xl font-bold text-purple-600">3.5분</div>
+						<div className="text-2xl font-bold text-purple-600">-</div>
 						<div className="text-sm text-gray-600">평균 처리시간</div>
 					</div>
 				</div>

@@ -57,7 +57,7 @@ export async function addOrderItem(params: {
   // 메뉴 스냅샷을 위해 현재 이름/가격 조회
   const { data: mi, error: e1 } = await supabase
     .from('menu_item')
-    .select('name, price')
+    .select('name, price, station')
     .eq('id', params.menuItemId)
     .single()
   if (e1) throw new Error(e1.message)
@@ -71,7 +71,11 @@ export async function addOrderItem(params: {
     note: params.note ?? null,
     status: 'queued' as const,
   }
-  const { error: e2 } = await supabase.from('order_item').insert(row)
+  const { data: inserted, error: e2 } = await supabase
+    .from('order_item')
+    .insert(row)
+    .select('id')
+    .single()
   if (e2) throw new Error(e2.message)
 
   // 주문이 처음 추가되면 sent_to_kitchen 으로 전환(주방 전송)
@@ -81,6 +85,19 @@ export async function addOrderItem(params: {
     .eq('id', params.orderId)
     .in('status', ['open']) // open일 때만
   if (e3) throw new Error(e3.message)
+
+  // KDS 큐 등록(스테이션별)
+  try {
+    const station = (mi as any)?.station || 'main'
+    if (inserted?.id) {
+      const { error: qe } = await supabase
+        .from('kitchen_queue')
+        .insert({ order_item_id: inserted.id, station, status: 'queued' })
+      if (qe) console.error('enqueue kitchen failed', qe.message)
+    }
+  } catch (err) {
+    console.error('enqueue kitchen exception', (err as any)?.message || err)
+  }
 
   revalidatePath(`/tables`)
   revalidatePath(`/tables/[tableId]`)

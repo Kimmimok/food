@@ -125,7 +125,10 @@ export async function addMultipleToTableOrder(params: { tableId: string; items: 
     status: 'queued' as const,
   }))
 
-  const { error: e2 } = await supabase.from('order_item').insert(rows)
+  const { data: insertedItems = [], error: e2 } = await supabase
+    .from('order_item')
+    .insert(rows)
+    .select('id, menu_item_id')
   if (e2) throw new Error(e2.message)
 
   // mark ticket as sent_to_kitchen if it was open
@@ -135,6 +138,27 @@ export async function addMultipleToTableOrder(params: { tableId: string; items: 
     .eq('id', order.id)
     .in('status', ['open'])
   if (e3) throw new Error(e3.message)
+
+  // enqueue items into kitchen_queue per station
+  try {
+    const { data: enrichedMenu = [] } = await supabase
+      .from('menu_item')
+      .select('id, station')
+      .in('id', ids)
+    const stationMap: Record<string, string> = {}
+    for (const em of enrichedMenu) stationMap[em.id] = em.station || 'main'
+
+    const qInserts = insertedItems.map((oi: any) => ({
+      order_item_id: oi.id,
+      station: stationMap[oi.menu_item_id] || 'main',
+      status: 'queued'
+    }))
+    if (qInserts.length) {
+      await supabase.from('kitchen_queue').insert(qInserts)
+    }
+  } catch (e) {
+    console.error('enqueue kitchen_queue failed', e)
+  }
 
   revalidatePath(`/order/${params.tableId}`)
   return { ok: true }
