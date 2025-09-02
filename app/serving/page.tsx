@@ -14,72 +14,49 @@ export default async function ServingHome() {
 	const supabase = await supabaseServer()
 
 	// Get completed items that are ready for serving
-	const { data: kq = [] } = await supabase
-		.from('kitchen_queue')
+	// 음료/주류는 kitchen_queue에 없으므로 order_item에서 직접 가져옴
+	const { data: items = [] } = await supabase
+		.from('order_item')
 		.select(`
-			id, station, status, created_at, started_at, done_at,
-			order_item:order_item_id ( id, name_snapshot, qty, status, order_ticket:order_id ( id, table_id ) )
+			id, status, created_at,
+			name_snapshot, qty,
+			order_ticket:order_id ( id, table_id ),
+			menu_item:menu_item_id ( id, station )
 		`)
 		.eq('status', 'done')
-		.order('done_at', { ascending: false })
+		.order('created_at', { ascending: false })
 
 	let stationCounts: Record<string, number> = { main: 0, beverages: 0, dessert: 0 }
 	let recent: any[] = []
 	let tableLabelMap: Record<string,string> = {}
 
-	if ((kq || []).length > 0) {
-		// Count completed items by station
-		for (const r of (kq || [])) {
-			// beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
-			const effectiveStation = r.station === 'bar' ? 'beverages' : r.station
-			stationCounts[effectiveStation] = (stationCounts[effectiveStation]||0)+1
-		}
-		recent = (kq || []).slice(0,10)
-		const tableIds = Array.from(new Set(recent.map((q:any)=>q.order_item?.order_ticket?.table_id).filter(Boolean)))
-		if (tableIds.length) {
-			const { data: tables = [] } = await supabase
-				.from('dining_table')
-				.select('id,label')
-				.in('id', tableIds)
-			tableLabelMap = Object.fromEntries((tables||[]).map((t:any)=>[t.id, t.label]))
-		}
-	} else {
-		// Fallback to order_item source
-		const { data: items = [] } = await supabase
-			.from('order_item')
-			.select(`
-				id, status, created_at,
-				name_snapshot, qty,
-				order_ticket:order_id ( id, table_id ),
-				menu_item:menu_item_id ( id, station )
-			`)
-			.eq('status', 'done')
-			.order('created_at', { ascending: false })
+	// order_item에서 완료된 항목들로 station 카운트 계산
+	for (const it of items || []) {
+		const st = (it as any).menu_item?.station || 'main'
+		// beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+		const effectiveStation = st === 'bar' ? 'beverages' : st
+		stationCounts[effectiveStation] = (stationCounts[effectiveStation]||0)+1
+	}
 
-		for (const it of items || []) {
-			const st = (it as any).menu_item?.station || 'main'
-			// beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
-			const effectiveStation = st === 'bar' ? 'beverages' : st
-			stationCounts[effectiveStation] = (stationCounts[effectiveStation]||0)+1
-		}
-		recent = (items || []).slice(0, 10).map((it: any) => ({
+	// 최근 항목들 설정
+	recent = (items || []).slice(0, 10).map((it: any) => ({
+		id: it.id,
+		status: it.status,
+		order_item: {
 			id: it.id,
-			status: it.status,
-			order_item: {
-				id: it.id,
-				name_snapshot: it.name_snapshot,
-				qty: it.qty,
-				order_ticket: it.order_ticket
-			}
-		}))
-		const tableIds = Array.from(new Set(recent.map((q:any)=>q.order_item?.order_ticket?.table_id).filter(Boolean)))
-		if (tableIds.length) {
-			const { data: tables = [] } = await supabase
-				.from('dining_table')
-				.select('id,label')
-				.in('id', tableIds)
-			tableLabelMap = Object.fromEntries((tables||[]).map((t:any)=>[t.id, t.label]))
+			name_snapshot: it.name_snapshot,
+			qty: it.qty,
+			order_ticket: it.order_ticket
 		}
+	}))
+
+	const tableIds = Array.from(new Set(recent.map((q:any)=>q.order_item?.order_ticket?.table_id).filter(Boolean)))
+	if (tableIds.length) {
+		const { data: tables = [] } = await supabase
+			.from('dining_table')
+			.select('id,label')
+			.in('id', tableIds)
+		tableLabelMap = Object.fromEntries((tables||[]).map((t:any)=>[t.id, t.label]))
 	}
 
 	const totalCompleted = Object.values(stationCounts).reduce((sum, count) => sum + count, 0)

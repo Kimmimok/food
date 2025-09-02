@@ -3,7 +3,6 @@ import { supabaseServer } from '../../lib/supabase-server'
 
 const STATIONS = [
 	{ id: 'main', name: '메인 키친', desc: '메인 요리 및 밥류', icon: '🍳' },
-	{ id: 'beverages', name: '음료/주류', desc: '음료 및 주류 준비', icon: '🥤' },
 	{ id: 'dessert', name: '디저트', desc: '후식 및 커피', icon: '🍰' },
 ]
 import { requireRole } from '../../lib/auth'
@@ -21,7 +20,7 @@ export default async function KitchenHome() {
 		`)
 		.order('created_at', { ascending: false })
 
-	let stationCounts: Record<string, number> = { main: 0, beverages: 0, dessert: 0 }
+	let stationCounts: Record<string, number> = { main: 0, dessert: 0 }
 	const totals = { queued: 0, in_progress: 0, done: 0 }
 	let recent: any[] = []
 	let tableLabelMap: Record<string,string> = {}

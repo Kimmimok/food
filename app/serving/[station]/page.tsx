@@ -22,64 +22,40 @@ export default async function ServingStationPage({ params }: { params: Promise<{
   const supabase = await sb()
 
   // 서빙 데이터: 완료된(doned) 상태의 아이템들만 로드
-  const { data: kq = [] } = await supabase
-    .from('kitchen_queue')
+  // 음료/주류는 kitchen_queue에 없으므로 order_item에서 직접 가져옴
+  const { data: items = [] } = await supabase
+    .from('order_item')
     .select(`
-      id, status, created_at, started_at, done_at, station,
-      order_item:order_item_id ( id, name_snapshot, qty, order_ticket:order_id ( id, table_id ) )
+      id, status, created_at,
+      name_snapshot, qty,
+      order_ticket:order_id ( id, table_id ),
+      menu_item:menu_item_id ( id, station )
     `)
-    .eq('station', station)
     .eq('status', 'done')
-    .order('done_at', { ascending: true })
+    .order('created_at', { ascending: true })
 
   let queue = []
-  if ((kq || []).length > 0) {
-    queue = (kq || []).map((r: any) => ({
-      id: String(r.id),
-      status: (Array.isArray(r.order_item) ? r.order_item[0]?.status : r.order_item?.status) ?? r.status,
-      created_at: r.created_at ?? null,
-      started_at: r.started_at ?? null,
-      done_at: r.done_at ?? null,
-      order_item: r.order_item ? ({
-        id: String(r.order_item.id),
-        name_snapshot: r.order_item.name_snapshot,
-        qty: r.order_item.qty,
-        order_ticket: r.order_item.order_ticket ? { id: r.order_item.order_ticket.id, table_id: r.order_item.order_ticket.table_id } : null,
-      }) : null
-    }))
-  } else {
-    // Fallback to order_item source
-    const { data: items = [] } = await supabase
-      .from('order_item')
-      .select(`
-        id, status, created_at,
-        name_snapshot, qty,
-        order_ticket:order_id ( id, table_id ),
-        menu_item:menu_item_id ( id, station )
-      `)
-      .eq('status', 'done')
-      .order('created_at', { ascending: true })
 
-    queue = (items || [])
-      .filter((it: any) => {
-        const itemStation = it.menu_item?.station || 'main'
-        // beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
-        return itemStation === station || (station === 'beverages' && itemStation === 'bar')
-      })
-      .map((it: any) => ({
+  // station에 맞는 완료된 항목들만 필터링
+  queue = (items || [])
+    .filter((it: any) => {
+      const itemStation = it.menu_item?.station || 'main'
+      // beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+      return itemStation === station || (station === 'beverages' && itemStation === 'bar')
+    })
+    .map((it: any) => ({
+      id: String(it.id),
+      status: it.status,
+      created_at: it.created_at ?? null,
+      started_at: null,
+      done_at: null,
+      order_item: {
         id: String(it.id),
-        status: it.status,
-        created_at: it.created_at ?? null,
-        started_at: null,
-        done_at: null,
-        order_item: {
-          id: String(it.id),
-          name_snapshot: it.name_snapshot,
-          qty: it.qty,
-          order_ticket: it.order_ticket ? { id: it.order_ticket.id, table_id: it.order_ticket.table_id } : null,
-        }
-      }))
-  }
+        name_snapshot: it.name_snapshot,
+        qty: it.qty,
+        order_ticket: it.order_ticket ? { id: it.order_ticket.id, table_id: it.order_ticket.table_id } : null,
+      }
+    }))
 
   // 테이블 라벨 맵
   const tableIds = Array.from(new Set(queue.map((q: any) => q.order_item?.order_ticket?.table_id).filter(Boolean)))

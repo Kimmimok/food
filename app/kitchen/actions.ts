@@ -49,6 +49,12 @@ export async function setKitchenStatus(orderItemId: string, next: KStatus) {
 /** 스테이션의 미완료 티켓을 일괄 완료 처리 */
 export async function bulkMarkDone(station: string) {
   const supabase = await sb()
+
+  // 음료/주류 스테이션은 주방에서 처리하지 않음
+  if (station === 'beverages') {
+    return
+  }
+
   // find order_items by station
   const { data: items = [], error: e } = await supabase
     .from('order_item')
@@ -66,6 +72,12 @@ export async function bulkMarkDone(station: string) {
 /** 완료된 것을 서빙완료 처리 */
 export async function bulkMarkServed(station: string) {
   const supabase = await sb()
+
+  // 음료/주류 스테이션은 주방에서 처리하지 않음
+  if (station === 'beverages') {
+    return
+  }
+
   const { data: items = [], error: e } = await supabase
     .from('order_item')
     .select('id, menu_item:menu_item_id(id, station), status')

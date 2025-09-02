@@ -21,6 +21,23 @@ export default async function StationPage({ params }: { params: Promise<{ statio
   const { station } = await params
   const supabase = await sb()
 
+  // 음료/주류 스테이션은 주방에서 처리하지 않음
+  if (station === 'beverages') {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">KDS — 음료/주류</h2>
+          <div className="text-sm text-gray-500">음료/주류는 서빙 관리에서 처리됩니다</div>
+        </div>
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🥤</div>
+          <p className="text-gray-500">음료/주류 메뉴는 주방에서 처리하지 않습니다.</p>
+          <p className="text-gray-400 text-sm mt-2">서빙 관리 페이지에서 확인하세요.</p>
+        </div>
+      </div>
+    )
+  }
+
   // KDS 데이터: order_item + menu_item.station 기준으로 로드
   // Prefer kitchen_queue rows if present (includes order_item join)
   const { data: kq = [] } = await supabase
