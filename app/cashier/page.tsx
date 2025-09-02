@@ -21,14 +21,20 @@ export default async function CashierPage() {
 	await requireRole(['manager','admin'])
 	const supabase = await sb()
 
-	// 열린 주문 불러오기
-	const { data: orders = [] } = await supabase
+	// 열린 주문 불러오기 (세부 항목 포함)
+	const { data: ordersData = [] } = await supabase
 		.from('order_ticket')
 		.select(`
 			id, table_id, total, status, created_at,
-			dining_table ( label )
+			dining_table ( label ),
+			order_item (
+				id, name_snapshot, qty, price, status,
+				menu_item ( name, price )
+			)
 		`)
 		.in('status', ['open', 'sent_to_kitchen'])
+
+	const orders = ordersData || []
 
 	return (
 		<div className="space-y-6">

@@ -10,11 +10,31 @@ type Order = {
   total: number
   status: string
   dining_table?: { label: string }
+  order_item?: Array<{
+    id: string
+    name_snapshot: string
+    qty: number
+    price: number
+    status: string
+    menu_item?: { name: string; price: number }
+  }>
 }
 
 export default function CashierPanel({ orders }: { orders: Order[] }) {
-  const [method, setMethod] = useState<'cash' | 'card'>('cash')
+  const safeOrders = orders || []
+  const [method, setMethod] = useState<'cash' | 'card'>('card')
   const [amount, setAmount] = useState('')
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
+
+  const toggleExpanded = (orderId: string) => {
+    const newExpanded = new Set(expandedOrders)
+    if (newExpanded.has(orderId)) {
+      newExpanded.delete(orderId)
+    } else {
+      newExpanded.add(orderId)
+    }
+    setExpandedOrders(newExpanded)
+  }
 
   const handlePay = async (orderId: string, total: number) => {
     const amt = Number(amount || total)
@@ -28,40 +48,104 @@ export default function CashierPanel({ orders }: { orders: Order[] }) {
 
   return (
     <div className="space-y-4">
-      {orders.map(o => (
-        <div key={o.id} className="border rounded-xl p-3">
-          <div className="flex justify-between">
-            <div>
-              <div className="font-semibold">테이블 {o.dining_table?.label ?? ''}</div>
-              <div className="text-xs opacity-70">{o.status}</div>
+      {safeOrders.map(o => {
+        const isExpanded = expandedOrders.has(o.id)
+        const totalAmount = o.total ?? 0
+        
+        return (
+          <div key={o.id} className="border rounded-xl p-4 bg-white">
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="font-semibold text-lg">테이블 {o.dining_table?.label ?? ''}</div>
+                  <div className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{o.status}</div>
+                </div>
+                <div className="text-sm text-gray-600">
+                  주문 시간: {new Date(o.created_at).toLocaleString('ko-KR')}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-green-600">₩ {totalAmount.toLocaleString()}</div>
+                <div className="text-sm text-gray-500">합계 금액</div>
+              </div>
             </div>
-            <div className="text-sm">합계 ₩ {o.total?.toLocaleString() ?? 0}</div>
-          </div>
 
-          <div className="mt-3 flex flex-wrap gap-2 items-center">
-            <select value={method} onChange={e => setMethod(e.target.value as any)} className="border rounded px-2 py-1 text-sm">
-              <option value="cash">현금</option>
-              <option value="card">카드</option>
-            </select>
-            <input
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              placeholder="금액"
-              inputMode="decimal"
-              className="border rounded px-2 py-1 text-sm w-28"
-            />
-            <button
-              onClick={() => handlePay(o.id, o.total ?? 0)}
-              className="px-3 py-1 rounded bg-black text-white text-sm"
-            >
-              결제 완료
-            </button>
+            {/* 세부 내역 토글 버튼 */}
+            <div className="mb-3">
+              <button
+                onClick={() => toggleExpanded(o.id)}
+                className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              >
+                {isExpanded ? '▼' : '▶'} 세부 내역 {o.order_item?.length ?? 0}개 항목
+              </button>
+            </div>
+
+            {/* 세부 내역 */}
+            {isExpanded && o.order_item && o.order_item.length > 0 && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div className="space-y-2">
+                  {o.order_item.map(item => (
+                    <div key={item.id} className="flex justify-between items-center text-sm">
+                      <div className="flex-1">
+                        <span className="font-medium">{item.name_snapshot}</span>
+                        <span className="text-gray-500 ml-2">× {item.qty}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-medium">₩ {(item.price * item.qty).toLocaleString()}</span>
+                        <span className="text-gray-500 ml-2">(₩ {item.price.toLocaleString()} × {item.qty})</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t mt-3 pt-2 flex justify-between font-semibold">
+                  <span>총 합계</span>
+                  <span>₩ {totalAmount.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+
+            {/* 결제 영역 */}
+            <div className="flex flex-wrap gap-3 items-center pt-3 border-t">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium">결제 방식:</label>
+                <select 
+                  value={method} 
+                  onChange={e => setMethod(e.target.value as any)} 
+                  className="border rounded px-3 py-2 text-sm bg-white"
+                >
+                  <option value="cash">현금</option>
+                  <option value="card">카드</option>
+                </select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium">결제 금액:</label>
+                <input
+                  value={amount || totalAmount.toString()}
+                  onChange={e => setAmount(e.target.value)}
+                  placeholder="금액"
+                  inputMode="decimal"
+                  className="border rounded px-3 py-2 text-sm w-32"
+                />
+                <span className="text-sm text-gray-500">원</span>
+              </div>
+              
+              <button
+                onClick={() => handlePay(o.id, totalAmount)}
+                className="px-4 py-2 rounded bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+              >
+                결제 완료
+              </button>
+            </div>
           </div>
+        )
+      })}
+
+      {safeOrders.length === 0 && (
+        <div className="text-center py-8">
+          <div className="text-gray-400 text-4xl mb-4">💳</div>
+          <p className="text-gray-500">결제 대기중인 주문이 없습니다.</p>
         </div>
-      ))}
-
-      {orders.length === 0 && (
-        <p className="text-sm opacity-70">열린 주문이 없습니다.</p>
       )}
     </div>
   )

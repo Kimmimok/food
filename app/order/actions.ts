@@ -96,10 +96,14 @@ export async function addToTableOrder(params: { tableId: string; menuItemId: str
   try {
     const station = (mi as any)?.station || 'main'
     if (inserted?.id) {
-      const { error: qe } = await supabase
-        .from('kitchen_queue')
-        .insert({ order_item_id: inserted.id, station, status: 'queued' })
-      if (qe) console.error('enqueue kitchen failed', qe.message)
+      // idempotent insert: only insert if not exists
+      const { data: exists } = await supabase.from('kitchen_queue').select('id').eq('order_item_id', inserted.id).maybeSingle()
+      if (!exists) {
+        const { error: qe } = await supabase
+          .from('kitchen_queue')
+          .insert({ order_item_id: inserted.id, station, status: 'queued' })
+        if (qe) console.error('enqueue kitchen failed', qe.message)
+      }
     }
   } catch (err) {
     console.error('enqueue kitchen exception', (err as any)?.message || err)
@@ -171,7 +175,16 @@ export async function addMultipleToTableOrder(params: { tableId: string; items: 
       status: 'queued'
     }))
     if (qInserts.length) {
-      await supabase.from('kitchen_queue').insert(qInserts)
+      // use upsert-like logic: insert only those order_item_id not present
+      const ids = qInserts.map((q:any)=>q.order_item_id)
+      const { data: existing = [] } = await supabase.from('kitchen_queue').select('order_item_id').in('order_item_id', ids)
+      const existingIds = new Set((existing||[]).map((e:any)=>e.order_item_id))
+      const toInsert = qInserts.filter((q:any)=>!existingIds.has(q.order_item_id))
+      if (toInsert.length) {
+        const { data: kdata, error: kerr } = await supabase.from('kitchen_queue').insert(toInsert).select('id, order_item_id, station, status')
+        if (kerr) console.error('kitchen_queue insert error', kerr.message)
+        else console.debug('kitchen_queue inserted', kdata)
+      }
     }
   } catch (e) {
     console.error('enqueue kitchen_queue failed', e)

@@ -7,7 +7,7 @@ import { toggleSoldOut, upsertMenuItem, deleteMenuItem, reorderMenuItems, setMen
 import ItemCard from '@/components/ItemCard'
 import { supabase } from '@/lib/supabase-client'
 
-type Category = { id: string; name: string }
+type Category = { id: string; name: string; sort_order: number }
 type Item = {
   id: string
   name: string

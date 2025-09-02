@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
-import KitchenBoard from '@/components/kds/KitchenBoard'
-import { bulkMarkDone, bulkMarkServed } from '../actions'
+import ServingBoard from '@/components/serving/ServingBoard'
+import { bulkMarkServed } from '../../kitchen/actions'
 
 async function sb() {
   const c = await cookies()
@@ -17,12 +17,11 @@ async function sb() {
   )
 }
 
-export default async function StationPage({ params }: { params: Promise<{ station: string }> }) {
+export default async function ServingStationPage({ params }: { params: Promise<{ station: string }> }) {
   const { station } = await params
   const supabase = await sb()
 
-  // KDS 데이터: order_item + menu_item.station 기준으로 로드
-  // Prefer kitchen_queue rows if present (includes order_item join)
+  // 서빙 데이터: 완료된(doned) 상태의 아이템들만 로드
   const { data: kq = [] } = await supabase
     .from('kitchen_queue')
     .select(`
@@ -30,13 +29,13 @@ export default async function StationPage({ params }: { params: Promise<{ statio
       order_item:order_item_id ( id, name_snapshot, qty, order_ticket:order_id ( id, table_id ) )
     `)
     .eq('station', station)
-    .order('created_at', { ascending: true })
+    .eq('status', 'done')
+    .order('done_at', { ascending: true })
 
   let queue = []
   if ((kq || []).length > 0) {
     queue = (kq || []).map((r: any) => ({
       id: String(r.id),
-      // prefer order_item.status when available
       status: (Array.isArray(r.order_item) ? r.order_item[0]?.status : r.order_item?.status) ?? r.status,
       created_at: r.created_at ?? null,
       started_at: r.started_at ?? null,
@@ -49,7 +48,7 @@ export default async function StationPage({ params }: { params: Promise<{ statio
       }) : null
     }))
   } else {
-    // Fallback to order_item -> menu_item.station mapping
+    // Fallback to order_item source
     const { data: items = [] } = await supabase
       .from('order_item')
       .select(`
@@ -58,6 +57,7 @@ export default async function StationPage({ params }: { params: Promise<{ statio
         order_ticket:order_id ( id, table_id ),
         menu_item:menu_item_id ( id, station )
       `)
+      .eq('status', 'done')
       .order('created_at', { ascending: true })
 
     queue = (items || [])
@@ -90,20 +90,18 @@ export default async function StationPage({ params }: { params: Promise<{ statio
   }
 
   // 일괄 버튼(서버 액션)
-  const DoneAll = async () => { 'use server'; await bulkMarkDone(station) }
   const ServedAll = async () => { 'use server'; await bulkMarkServed(station) }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">KDS — {station}</h2>
+        <h2 className="text-xl font-semibold">서빙 관리 — {station}</h2>
         <div className="flex gap-2">
-          <form action={DoneAll}><button className="px-3 py-2 border rounded text-sm">모두 완료</button></form>
-          <form action={ServedAll}><button className="px-3 py-2 border rounded text-sm">완료 → 서빙완료</button></form>
+          <form action={ServedAll}><button className="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700">모두 서빙완료</button></form>
         </div>
       </div>
 
-      <KitchenBoard station={station} initialQueue={queue as any} tableLabelMap={tableLabelMap} />
+      <ServingBoard station={station} initialQueue={queue as any} tableLabelMap={tableLabelMap} />
     </div>
   )
 }

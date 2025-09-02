@@ -6,8 +6,8 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { tableId, items } = body
     if (!tableId) return NextResponse.json({ error: 'missing tableId' }, { status: 400 })
-    await addMultipleToTableOrder({ tableId, items })
-    return NextResponse.json({ ok: true })
+  const res = await addMultipleToTableOrder({ tableId, items })
+  return NextResponse.json({ ok: true, result: res })
   } catch (err:any) {
     return NextResponse.json({ error: err.message || String(err) }, { status: 500 })
   }

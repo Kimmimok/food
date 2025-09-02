@@ -1,0 +1,33 @@
+-- PostgreSQL psql 명령어로 테이블 구조 확인하기
+-- 터미널에서 실행 (Supabase 연결 정보 필요)
+
+-- 1. 모든 테이블 목록 보기
+-- \dt
+
+-- 2. 특정 테이블 구조 상세 보기
+-- \d public.menu_item
+-- \d public.menu_category
+-- \d public.order_ticket
+-- \d public.order_item
+-- \d public.dining_table
+-- \d public.kitchen_queue
+-- \d public.waitlist
+-- \d public.payment
+-- \d public.user_profile
+-- \d public.restaurant_settings
+
+-- 3. 모든 테이블의 컬럼 정보 보기
+-- SELECT
+--     schemaname,
+--     tablename,
+--     attname as column_name,
+--     format_type(atttypid, atttypmod) as data_type,
+--     attnotnull as not_null,
+--     adsrc as default_value
+-- FROM pg_attribute
+-- JOIN pg_class ON pg_class.oid = pg_attribute.attrelid
+-- JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+-- WHERE pg_namespace.nspname = 'public'
+--     AND pg_class.relkind = 'r'
+--     AND attname NOT IN ('cmin', 'cmax', 'ctid', 'tableoid', 'xmin', 'xmax')
+-- ORDER BY schemaname, tablename, attnum;

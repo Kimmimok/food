@@ -1,0 +1,96 @@
+table_schema,table_name,column_name,data_type,character_maximum_length,numeric_precision,numeric_scale,is_nullable,column_default,is_primary_key,is_foreign_key,foreign_table_name,foreign_column_name
+public,dining_table,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,dining_table,label,text,null,null,null,NO,null,NO,NO,null,null
+public,dining_table,capacity,integer,null,32,0,NO,2,NO,NO,null,null
+public,dining_table,status,text,null,null,null,NO,'empty'::text,NO,NO,null,null
+public,dining_table,table_token,text,null,null,null,YES,null,NO,NO,null,null
+public,kitchen_queue,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,kitchen_queue,order_item_id,uuid,null,null,null,YES,null,NO,YES,order_item,id
+public,kitchen_queue,station,text,null,null,null,NO,'main'::text,NO,NO,null,null
+public,kitchen_queue,status,text,null,null,null,NO,'queued'::text,NO,NO,null,null
+public,kitchen_queue,ticket_no,bigint,null,64,0,NO,null,NO,NO,null,null
+public,kitchen_queue,created_at,timestamp with time zone,null,null,null,YES,now(),NO,NO,null,null
+public,kitchen_queue,started_at,timestamp with time zone,null,null,null,YES,null,NO,NO,null,null
+public,kitchen_queue,done_at,timestamp with time zone,null,null,null,YES,null,NO,NO,null,null
+public,menu_category,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,menu_category,name,text,null,null,null,NO,null,NO,NO,null,null
+public,menu_category,sort_order,integer,null,32,0,NO,0,NO,NO,null,null
+public,menu_category,is_active,boolean,null,null,null,NO,true,NO,NO,null,null
+public,menu_item,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,menu_item,category_id,uuid,null,null,null,YES,null,NO,YES,menu_category,id
+public,menu_item,name,text,null,null,null,NO,null,NO,NO,null,null
+public,menu_item,price,numeric,null,null,null,NO,null,NO,NO,null,null
+public,menu_item,sku,text,null,null,null,YES,null,NO,NO,null,null
+public,menu_item,is_sold_out,boolean,null,null,null,NO,false,NO,NO,null,null
+public,menu_item,is_active,boolean,null,null,null,NO,true,NO,NO,null,null
+public,menu_item,sort_order,integer,null,32,0,NO,0,NO,NO,null,null
+public,menu_item,created_at,timestamp with time zone,null,null,null,YES,now(),NO,NO,null,null
+public,menu_item,image_url,text,null,null,null,YES,null,NO,NO,null,null
+public,menu_item,station,text,null,null,null,NO,'main'::text,NO,NO,null,null
+public,menu_option,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,menu_option,group_id,uuid,null,null,null,YES,null,NO,YES,menu_option_group,id
+public,menu_option,name,text,null,null,null,NO,null,NO,NO,null,null
+public,menu_option,price_delta,numeric,null,null,null,NO,0,NO,NO,null,null
+public,menu_option,sort_order,integer,null,32,0,NO,0,NO,NO,null,null
+public,menu_option_group,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,menu_option_group,menu_item_id,uuid,null,null,null,YES,null,NO,YES,menu_item,id
+public,menu_option_group,name,text,null,null,null,NO,null,NO,NO,null,null
+public,menu_option_group,min_select,integer,null,32,0,NO,0,NO,NO,null,null
+public,menu_option_group,max_select,integer,null,32,0,NO,1,NO,NO,null,null
+public,menu_option_group,sort_order,integer,null,32,0,NO,0,NO,NO,null,null
+public,order_item,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,order_item,order_id,uuid,null,null,null,YES,null,NO,YES,order_ticket,id
+public,order_item,menu_item_id,uuid,null,null,null,YES,null,NO,YES,menu_item,id
+public,order_item,name_snapshot,text,null,null,null,NO,null,NO,NO,null,null
+public,order_item,price_snapshot,numeric,null,null,null,NO,null,NO,NO,null,null
+public,order_item,qty,integer,null,32,0,NO,1,NO,NO,null,null
+public,order_item,status,text,null,null,null,NO,'queued'::text,NO,NO,null,null
+public,order_item,note,text,null,null,null,YES,null,NO,NO,null,null
+public,order_item_option,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,order_item_option,order_item_id,uuid,null,null,null,YES,null,NO,YES,order_item,id
+public,order_item_option,option_name,text,null,null,null,NO,null,NO,NO,null,null
+public,order_item_option,price_delta,numeric,null,null,null,NO,0,NO,NO,null,null
+public,order_ticket,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,order_ticket,order_no,bigint,null,64,0,NO,nextval('order_ticket_order_no_seq'::regclass),NO,NO,null,null
+public,order_ticket,table_id,uuid,null,null,null,YES,null,NO,YES,dining_table,id
+public,order_ticket,channel,text,null,null,null,NO,'dine_in'::text,NO,NO,null,null
+public,order_ticket,status,text,null,null,null,NO,'open'::text,NO,NO,null,null
+public,order_ticket,subtotal,numeric,null,null,null,NO,0,NO,NO,null,null
+public,order_ticket,discount,numeric,null,null,null,NO,0,NO,NO,null,null
+public,order_ticket,tax,numeric,null,null,null,NO,0,NO,NO,null,null
+public,order_ticket,total,numeric,null,null,null,NO,0,NO,NO,null,null
+public,order_ticket,note,text,null,null,null,YES,null,NO,NO,null,null
+public,order_ticket,created_at,timestamp with time zone,null,null,null,YES,now(),NO,NO,null,null
+public,order_ticket,closed_at,timestamp with time zone,null,null,null,YES,null,NO,NO,null,null
+public,payment,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,payment,order_id,uuid,null,null,null,YES,null,NO,YES,order_ticket,id
+public,payment,method,text,null,null,null,NO,null,NO,NO,null,null
+public,payment,amount,numeric,null,null,null,NO,null,NO,NO,null,null
+public,payment,paid_at,timestamp with time zone,null,null,null,YES,now(),NO,NO,null,null
+public,payment,ref_no,text,null,null,null,YES,null,NO,NO,null,null
+public,restaurant_settings,id,integer,null,32,0,NO,1,YES,NO,null,null
+public,restaurant_settings,name,text,null,null,null,YES,null,NO,NO,null,null
+public,restaurant_settings,business_number,text,null,null,null,YES,null,NO,NO,null,null
+public,restaurant_settings,phone,text,null,null,null,YES,null,NO,NO,null,null
+public,restaurant_settings,address,text,null,null,null,YES,null,NO,NO,null,null
+public,restaurant_settings,email,text,null,null,null,YES,null,NO,NO,null,null
+public,restaurant_settings,created_at,timestamp with time zone,null,null,null,NO,now(),NO,NO,null,null
+public,restaurant_settings,updated_at,timestamp with time zone,null,null,null,NO,now(),NO,NO,null,null
+public,restaurant_settings,table_count,integer,null,32,0,YES,0,NO,NO,null,null
+public,restaurant_settings,default_table_capacity,integer,null,32,0,YES,4,NO,NO,null,null
+public,restaurant_settings,table_capacities,jsonb,null,null,null,YES,'[]'::jsonb,NO,NO,null,null
+public,user_profile,id,uuid,null,null,null,NO,null,YES,NO,null,null
+public,user_profile,email,text,null,null,null,YES,null,NO,NO,null,null
+public,user_profile,name,text,null,null,null,YES,null,NO,NO,null,null
+public,user_profile,role,text,null,null,null,NO,'member'::text,NO,NO,null,null
+public,user_profile,points,integer,null,32,0,NO,0,NO,NO,null,null
+public,user_profile,created_at,timestamp with time zone,null,null,null,NO,now(),NO,NO,null,null
+public,waitlist,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
+public,waitlist,name,text,null,null,null,NO,null,NO,NO,null,null
+public,waitlist,phone,text,null,null,null,YES,null,NO,NO,null,null
+public,waitlist,size,integer,null,32,0,NO,2,NO,NO,null,null
+public,waitlist,status,text,null,null,null,NO,'waiting'::text,NO,NO,null,null
+public,waitlist,note,text,null,null,null,YES,null,NO,NO,null,null
+public,waitlist,created_at,timestamp with time zone,null,null,null,YES,now(),NO,NO,null,null
+public,waitlist,called_at,timestamp with time zone,null,null,null,YES,null,NO,NO,null,null
+public,waitlist,seated_table_id,uuid,null,null,null,YES,null,NO,YES,dining_table,id
