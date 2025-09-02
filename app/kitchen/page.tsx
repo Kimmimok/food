@@ -12,19 +12,53 @@ export default async function KitchenHome() {
 	await requireRole(['manager','admin'])
 	const supabase = await supabaseServer()
 
-	// per-station queued counts
-	const { data: perStation = [] } = await supabase
+	// fetch kitchen queue with order item + ticket info
+	const { data: queue = [] } = await supabase
 		.from('kitchen_queue')
-		.select('station, status')
+		.select(`
+			id, station, status, created_at, started_at, done_at,
+			order_item:order_item_id ( id, name_snapshot, qty, order_ticket:order_id ( id, table_id ) )
+		`)
+		.order('created_at', { ascending: false })
 
 	const stationCounts: Record<string, number> = { main: 0, bar: 0, dessert: 0 }
-	for (const r of perStation || []) if (r.status === 'queued') stationCounts[r.station] = (stationCounts[r.station]||0)+1
-
-	// global status counts
 	const totals = { queued: 0, in_progress: 0, done: 0 }
-	for (const r of perStation || []) {
+	for (const r of queue || []) {
+		if (r.status === 'queued') stationCounts[r.station] = (stationCounts[r.station]||0)+1
 		if (r.status in totals) (totals as any)[r.status]++
 	}
+
+	// recent items (limit 10)
+	const recent = (queue || []).slice(0, 10)
+
+	// table labels map
+	const tableIds = Array.from(new Set(recent.map((q:any)=>q.order_item?.order_ticket?.table_id).filter(Boolean)))
+	let tableLabelMap: Record<string,string> = {}
+	if (tableIds.length) {
+		const { data: tables = [] } = await supabase
+			.from('dining_table')
+			.select('id,label')
+			.in('id', tableIds)
+		tableLabelMap = Object.fromEntries((tables||[]).map((t:any)=>[t.id, t.label]))
+	}
+
+	// average processing time (done_at - started_at) in seconds
+	const { data: doneRows = [] } = await supabase
+		.from('kitchen_queue')
+		.select('started_at, done_at')
+		.is('started_at', null)
+		.not('done_at','is', null)
+	// Note: above query expects started_at IS NOT NULL and done_at IS NOT NULL, but supabase filters vary; we'll compute from queue
+	let avgSeconds: number | null = null
+	const times: number[] = []
+	for (const r of queue || []) {
+		if (r.started_at && r.done_at) {
+			const s = new Date(r.started_at).getTime()
+			const d = new Date(r.done_at).getTime()
+			if (!isNaN(s) && !isNaN(d) && d > s) times.push((d - s) / 1000)
+		}
+	}
+	if (times.length) avgSeconds = Math.round(times.reduce((a,b)=>a+b,0)/times.length)
 
 	return (
 		<div className="space-y-6">

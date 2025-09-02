@@ -43,11 +43,7 @@ export default async function OrderQrPage({ params }: any) {
           <div className="text-center space-y-2">
             <h1 className="text-2xl font-bold text-gray-900">{tableLabel}</h1>
             <p className="text-base text-gray-600">메뉴를 선택하고 주문해보세요</p>
-            {!isValidTable && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <p className="text-sm text-yellow-800">⚠️ 테이블 정보가 등록되어 있지 않습니다. 임시 주문으로 처리됩니다.</p>
-              </div>
-            )}
+            {/* 테이블 미등록 경고 제거 (디자인 정리) */}
           </div>
         </div>
       </div>

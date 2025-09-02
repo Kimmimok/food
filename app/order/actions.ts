@@ -71,7 +71,7 @@ export async function addToTableOrder(params: { tableId: string; menuItemId: str
   // 메뉴 스냅샷 조회
   const { data: mi, error: e1 } = await supabase
     .from('menu_item')
-    .select('name, price')
+  .select('name, price, station')
     .eq('id', params.menuItemId)
     .single()
   if (e1) throw new Error(e1.message)
@@ -85,8 +85,25 @@ export async function addToTableOrder(params: { tableId: string; menuItemId: str
     note: params.note ?? null,
     status: 'queued' as const,
   }
-  const { error: e2 } = await supabase.from('order_item').insert(row)
+  const { data: inserted, error: e2 } = await supabase
+    .from('order_item')
+    .insert(row)
+    .select('id')
+    .single()
   if (e2) throw new Error(e2.message)
+
+  // enqueue to kitchen_queue based on menu_item.station
+  try {
+    const station = (mi as any)?.station || 'main'
+    if (inserted?.id) {
+      const { error: qe } = await supabase
+        .from('kitchen_queue')
+        .insert({ order_item_id: inserted.id, station, status: 'queued' })
+      if (qe) console.error('enqueue kitchen failed', qe.message)
+    }
+  } catch (err) {
+    console.error('enqueue kitchen exception', (err as any)?.message || err)
+  }
 
   // 첫 추가 시 주방으로 전송 상태로 전환
   const { error: e3 } = await supabase
