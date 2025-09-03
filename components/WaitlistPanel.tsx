@@ -22,6 +22,7 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
   const [rows, setRows] = useState<Wait[]>(initialRows)
   const [draft, setDraft] = useState({ name: '', phone: '', size: '2', note: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [userRole, setUserRole] = useState<'guest'|'member'|'manager'|'admin'>('guest')
   const tableMap = useMemo(() => Object.fromEntries(tables.map(t => [t.id, t.label])), [tables])
 
   // Realtime: waitlist 변경
@@ -50,6 +51,18 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
       })
       .subscribe()
     return () => { client.removeChannel(ch) }
+  }, [])
+
+  // 사용자 역할 확인 (매니저/어드민 여부)
+  useEffect(() => {
+    const client = supabase()
+    client.auth.getUser().then(({ data }) => {
+      const user = data?.user ?? null
+      if (!user) return setUserRole('guest')
+      client.from('user_profile').select('role').eq('id', user.id).maybeSingle().then(({ data: p }) => {
+        setUserRole((p?.role as any) ?? 'member')
+      }).catch(() => setUserRole('member'))
+    })
   }, [])
 
   const waiting = rows.filter(r => r.status === 'waiting')
@@ -164,15 +177,17 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
           </div>
         </div>
         
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <form action={expireCalled5}>
-            <button className="w-full h-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors">
-              호출 만료 처리
-              <br />
-              <span className="text-xs">(5분 기준)</span>
-            </button>
-          </form>
-        </div>
+        { (userRole === 'manager' || userRole === 'admin') && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <form action={expireCalled5}>
+              <button className="w-full h-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors">
+                호출 만료 처리
+                <br />
+                <span className="text-xs">(5분 기준)</span>
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
