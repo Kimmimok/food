@@ -16,6 +16,8 @@ export async function upsertRestaurantSettings(payload: {
   table_capacities?: number[]
   enable_new_order_sound?: boolean
   enable_new_order_popup?: boolean
+  hide_urls_in_qr?: boolean
+  hide_urls_on_web?: boolean
 }) {
   await requireRole(['manager','admin'])
   const supabase = await supabaseServer()
@@ -31,6 +33,8 @@ export async function upsertRestaurantSettings(payload: {
   table_capacities: payload.table_capacities ? payload.table_capacities : null,
     enable_new_order_sound: typeof payload.enable_new_order_sound === 'boolean' ? payload.enable_new_order_sound : null,
     enable_new_order_popup: typeof payload.enable_new_order_popup === 'boolean' ? payload.enable_new_order_popup : null,
+  hide_urls_in_qr: typeof payload.hide_urls_in_qr === 'boolean' ? payload.hide_urls_in_qr : null,
+  hide_urls_on_web: typeof payload.hide_urls_on_web === 'boolean' ? payload.hide_urls_on_web : null,
     updated_at: new Date().toISOString(),
   }
   const { error } = await supabase.from('restaurant_settings').upsert(row)

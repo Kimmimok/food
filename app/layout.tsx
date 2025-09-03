@@ -48,7 +48,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <NavLink href="/waitlist" icon="⏰" label="대기 관리" />
                   <NavLink href="/cashier" icon="💳" label="계산 관리" />
                   <NavLink href="/reports/sales" icon="📊" label="매출 리포트" />
-                  { (role === 'manager' || role === 'admin') && (
+                  { role === 'admin' && (
                     <NavLink href="/settings" icon="⚙️" label="설정" />
                   )}
                 </div>

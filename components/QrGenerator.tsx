@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 
-export default function QrGenerator({ defaultMax = 1 }: { defaultMax?: number }) {
+export default function QrGenerator({ defaultMax = 1, settings }: { defaultMax?: number; settings?: any }) {
   const [max, setMax] = useState<number>(defaultMax)
   const [base, setBase] = useState<string>('')
   const [items, setItems] = useState<Array<{ table: number; url: string; src?: string | null }>>([])
@@ -192,7 +192,8 @@ export default function QrGenerator({ defaultMax = 1 }: { defaultMax?: number })
   return (
     <div className="bg-white border rounded-lg p-4 shadow-sm">
       <h3 className="font-semibold">QR 코드 일괄 생성</h3>
-      <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+      {/* 컨트롤들을 세로 1열로 쌓이도록 수정 */}
+      <div className="mt-3 grid grid-cols-1 gap-3 items-start">
         <div>
           <label className="text-sm text-gray-600">마지막 테이블 번호 (0부터 포함)</label>
           <input type="number" value={String(max)} onChange={e=>setMax(Number(e.target.value))} className="w-full border rounded px-2 py-1 mt-1" />
@@ -200,17 +201,17 @@ export default function QrGenerator({ defaultMax = 1 }: { defaultMax?: number })
         </div>
         <div>
           <label className="text-sm text-gray-600">기본 접속 주소 (편집 가능)</label>
-          <div className="flex gap-2 mt-1">
-            <input type="text" value={base} onChange={e=>setBase(e.target.value)} placeholder="https://your-domain.com" className="flex-1 border rounded px-2 py-1" />
-            <button type="button" onClick={()=>{ if (typeof window !== 'undefined') setBase(window.location.origin) }} className="px-3 py-1 border rounded text-sm w-48">현재 도메인</button>
+          <div className="flex flex-col gap-2 mt-1">
+            <input type="text" value={base} onChange={e=>setBase(e.target.value)} placeholder="https://your-domain.com" className="w-full border rounded px-2 py-1" />
+            <button type="button" onClick={()=>{ if (typeof window !== 'undefined') setBase(window.location.origin) }} className="px-3 py-1 border rounded text-sm w-full">현재 도메인</button>
           </div>
           <div className="text-xs text-gray-400 mt-1">기본 도메인 또는 외부 URL을 입력하세요. 슬래시(/)는 자동 정리됩니다.</div>
         </div>
-        <div className="md:col-span-2 flex space-x-2">
-          <button type="button" onClick={generate} disabled={generating} className="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-50">생성</button>
-          <button type="button" onClick={downloadAllSequential} disabled={!items.length} className="px-3 py-2 bg-green-600 text-white rounded disabled:opacity-50">모두 다운로드</button>
-          <button type="button" onClick={printA4} disabled={!items.some(i=>i.src)} className="px-3 py-2 bg-indigo-600 text-white rounded disabled:opacity-50">인쇄 (A4, QR+번호)</button>
-          <button type="button" onClick={()=>{ setItems([]); setMsg(null) }} className="px-3 py-2 bg-gray-200 rounded">초기화</button>
+        <div className="flex flex-col space-y-2">
+          <button type="button" onClick={generate} disabled={generating} className="w-full px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-50">생성</button>
+          <button type="button" onClick={downloadAllSequential} disabled={!items.length} className="w-full px-3 py-2 bg-green-600 text-white rounded disabled:opacity-50">모두 다운로드</button>
+          <button type="button" onClick={printA4} disabled={!items.some(i=>i.src)} className="w-full px-3 py-2 bg-indigo-600 text-white rounded disabled:opacity-50">인쇄 (A4, QR+번호)</button>
+          <button type="button" onClick={()=>{ setItems([]); setMsg(null) }} className="w-full px-3 py-2 bg-gray-200 rounded">초기화</button>
         </div>
       </div>
 
@@ -225,8 +226,12 @@ export default function QrGenerator({ defaultMax = 1 }: { defaultMax?: number })
             </div>
             <div className="mt-2 flex space-x-2">
               <button onClick={()=>it.src && downloadDataUrl(it.src, it.table===0? 'waitlist-qr.png' : `table-${it.table}-qr.png`)} className="text-xs px-2 py-1 bg-blue-600 text-white rounded disabled:opacity-50" disabled={!it.src}>다운로드</button>
-              <button onClick={()=>copyUrl(it.url)} className="text-xs px-2 py-1 bg-gray-200 rounded">링크복사</button>
-              <a href={it.url} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 bg-green-600 text-white rounded">열기</a>
+              {!settings?.hide_urls_in_qr && (
+                <>
+                  <button onClick={()=>copyUrl(it.url)} className="text-xs px-2 py-1 bg-gray-200 rounded">링크복사</button>
+                  <a href={it.url} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 bg-green-600 text-white rounded">열기</a>
+                </>
+              )}
             </div>
           </div>
         ))}

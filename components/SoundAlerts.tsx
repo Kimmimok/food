@@ -13,10 +13,22 @@ export default function SoundAlerts() {
   // MP3 시도 + 폴백 준비
   useEffect(() => {
     // MP3 엘리먼트 준비 (존재 여부는 재생 시점에 판별)
-  // Safari/TypeScript 환경에서의 생성자 타입 경고 우회
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const AnyAudio: any = Audio
-  audioRef.current = new AnyAudio('/images/notify.mp3')
+    // 안전하게 브라우저의 Audio 생성자가 존재하는 경우만 인스턴스화
+    try {
+      if (typeof window !== 'undefined' && typeof (window as any).Audio !== 'undefined') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const AnyAudio: any = (window as any).Audio
+        // Some environments (rare) expose Audio but not as a constructible; guard with try
+        try {
+          audioRef.current = new AnyAudio('/images/notify.mp3')
+        } catch (err) {
+          // not constructible -> leave audioRef null and rely on WebAudio fallback
+          audioRef.current = null
+        }
+      }
+    } catch {
+      audioRef.current = null
+    }
     // 서버 설정 + 로컬 저장값 반영
     (async () => {
       try {
