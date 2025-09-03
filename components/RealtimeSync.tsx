@@ -60,7 +60,7 @@ export function RealtimeSync({ onUpdate }: RealtimeSyncProps) {
           const isInsert = type === 'INSERT'
           const justSent = type === 'UPDATE' && before?.status !== 'sent_to_kitchen' && after?.status === 'sent_to_kitchen'
           if (isInsert || justSent) {
-            // 토스트 팝업
+            // 토스트 팝업 (전역 설정과 무관하게 간단 안내는 유지)
             window.dispatchEvent(new CustomEvent('notify', {
               detail: {
                 message: '새 주문이 접수되었습니다.',

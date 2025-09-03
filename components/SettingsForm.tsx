@@ -1,6 +1,6 @@
 "use client"
 import { useState } from 'react'
-import { upsertRestaurantSettings, updateTableConfiguration } from '@/app/settings/actions'
+import { upsertRestaurantSettings, updateTableConfiguration } from '../app/settings/actions'
 
 export default function SettingsForm({ initial }: { initial?: any }) {
   const [form, setForm] = useState({
@@ -12,6 +12,8 @@ export default function SettingsForm({ initial }: { initial?: any }) {
   table_count: initial?.table_count ?? 0,
   default_table_capacity: initial?.default_table_capacity ?? 4,
   table_capacities: initial?.table_capacities ?? [],
+  enable_new_order_sound: initial?.enable_new_order_sound ?? true,
+  enable_new_order_popup: initial?.enable_new_order_popup ?? true,
   })
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -31,6 +33,8 @@ export default function SettingsForm({ initial }: { initial?: any }) {
         phone: form.phone,
         address: form.address,
         email: form.email,
+  enable_new_order_sound: !!form.enable_new_order_sound,
+  enable_new_order_popup: !!form.enable_new_order_popup,
       }
       await upsertRestaurantSettings(restaurantPayload as any)
       await updateTableConfiguration({ table_count: tableCount, default_table_capacity: form.default_table_capacity ? Number(form.default_table_capacity) : 4, table_capacities: capacities })
@@ -50,6 +54,8 @@ export default function SettingsForm({ initial }: { initial?: any }) {
         phone: form.phone,
         address: form.address,
         email: form.email,
+  enable_new_order_sound: !!form.enable_new_order_sound,
+  enable_new_order_popup: !!form.enable_new_order_popup,
       }
       await upsertRestaurantSettings(restaurantPayload as any)
       setMsg('식당 정보가 저장되었습니다')
@@ -107,6 +113,28 @@ export default function SettingsForm({ initial }: { initial?: any }) {
           ))}
         </div>
         <div className="text-xs text-gray-400 mt-1">각 테이블별 수용 인원을 개별로 설정합니다. 비워두면 기본값을 사용합니다.</div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded bg-white">
+        <label className="flex items-center space-x-3">
+          <input
+            type="checkbox"
+            checked={!!form.enable_new_order_sound}
+            onChange={e=>setForm(s=>({...s, enable_new_order_sound: e.target.checked}))}
+          />
+          <span>새 주문 사운드 알림 사용</span>
+        </label>
+        <label className="flex items-center space-x-3">
+          <input
+            type="checkbox"
+            checked={!!form.enable_new_order_popup}
+            onChange={e=>setForm(s=>({...s, enable_new_order_popup: e.target.checked}))}
+          />
+          <span>새 주문 팝업 표시 사용</span>
+        </label>
+        <div className="md:col-span-2 text-xs text-gray-500">
+          브라우저 자동재생 정책 때문에 사운드 알림은 한 번 버튼을 클릭해 활성화해야 할 수 있습니다. 설정이 켜져 있으면 다음 방문에도 유지됩니다.
+        </div>
       </div>
       {msg && <div className="text-sm text-green-600">{msg}</div>}
       <div className="flex items-center space-x-2">

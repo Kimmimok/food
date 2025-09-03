@@ -1,9 +1,11 @@
 ﻿import '../styles/globals.css'
-import { getUserAndRole } from '@/lib/auth'
-import LogoutButton from '@/components/LogoutButton'
-import { supabaseServer } from '@/lib/supabase-server'
-import Toasts from '@/components/Toast'
-import SoundAlerts from '@/components/SoundAlerts'
+import { getUserAndRole } from '../lib/auth'
+import LogoutButton from '../components/LogoutButton'
+import { supabaseServer } from '../lib/supabase-server'
+import Toasts from '../components/Toast'
+import SoundAlerts from '../components/SoundAlerts'
+import OrderPopup from '../components/OrderPopup'
+import { RealtimeSync } from '../components/RealtimeSync'
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { user, role } = await getUserAndRole()
@@ -85,9 +87,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </header>
               <div className="flex-1 overflow-auto p-6 bg-gray-50">
                 {children}
+                {/* 전역 실시간 구독 (이벤트 발생) */}
+                <RealtimeSync />
                 <Toasts />
                 {/* 브라우저 자동재생 정책을 준수하기 위한 사용자 활성화형 사운드 알림 */}
                 <SoundAlerts />
+                {/* 새 주문 상세 팝업 (전역, 최상단) */}
+                <OrderPopup />
               </div>
             </main>
           </div>
