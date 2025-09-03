@@ -85,8 +85,25 @@ export async function noShowWait(id: string) {
 /** 자동 만료(호출 후 5분 지나면 waiting으로 되돌리거나 no_show로 표기하고 싶다면) */
 export async function expireCalledOlderThan(minutes = 5) {
   const supabase = await sb()
-  const { error } = await supabase.rpc('fn_waitlist_expire_called', { p_minutes: minutes })
-  if (error) throw new Error(error.message)
+  try {
+    const { error } = await supabase.rpc('fn_waitlist_expire_called', { p_minutes: minutes })
+    if (error) throw error
+  } catch (err) {
+    // If RPC does not exist or fails, fallback to a direct update:
+    // Set status back to 'waiting' for rows in 'called' older than minutes.
+    try {
+      const cutoff = new Date(Date.now() - minutes * 60 * 1000).toISOString()
+      const { error: e2 } = await supabase
+        .from('waitlist')
+        .update({ status: 'waiting' })
+        .lt('called_at', cutoff)
+        .eq('status', 'called')
+      if (e2) throw e2
+    } catch (e) {
+      // If even fallback fails, surface the original error
+      throw new Error(err?.message || e?.message || 'expireCalledOlderThan failed')
+    }
+  }
   revalidatePath('/waitlist')
 }
 

@@ -45,7 +45,7 @@ export default async function WaitlistPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{restaurantName} (대기 신청)</h1>
-          <p className="text-gray-600 mt-1">고객 대기(신청)을 효율적으로 관리하고 테이블을 배정하세요</p>
+          <p className="text-gray-600 mt-1">대기(신청)을 등록하시고 잠시 기다려 주시면 감사하겠습니다.(5분이내에 입장하지 않으시면 다음분에게 기회를 드립니다.)</p>
         </div>
         <div className="flex items-center space-x-3">
           <div className="text-sm text-gray-500">
@@ -57,8 +57,7 @@ export default async function WaitlistPage() {
       
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">{/* placeholder for restaurantName */}</h1>
-          <div className="text-sm text-gray-600 mt-1">(대기 신청)</div>
+          
         </div>
         <WaitlistPanel initialRows={rows as any[]} tables={tables as any[]} />
       </div>
