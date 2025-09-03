@@ -229,18 +229,22 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                   >
                     📢 호출
                   </button>
-                  <button 
-                    onClick={() => cancelWait(w.id)} 
-                    className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-                  >
-                    취소
-                  </button>
-                  <button 
-                    onClick={() => noShowWait(w.id)} 
-                    className="px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
-                  >
-                    노쇼
-                  </button>
+                  {(userRole === 'manager' || userRole === 'admin') && (
+                    <>
+                      <button 
+                        onClick={() => cancelWait(w.id)} 
+                        className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                      >
+                        취소
+                      </button>
+                      <button 
+                        onClick={() => noShowWait(w.id)} 
+                        className="px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
+                      >
+                        노쇼
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -285,18 +289,22 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                 </div>
                 
                 <div className="flex gap-2">
-                  <button 
-                    onClick={() => cancelWait(w.id)} 
-                    className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-                  >
-                    취소
-                  </button>
-                  <button 
-                    onClick={() => noShowWait(w.id)} 
-                    className="flex-1 px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
-                  >
-                    노쇼 처리
-                  </button>
+                  {(userRole === 'manager' || userRole === 'admin') && (
+                    <>
+                      <button 
+                        onClick={() => cancelWait(w.id)} 
+                        className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                      >
+                        취소
+                      </button>
+                      <button 
+                        onClick={() => noShowWait(w.id)} 
+                        className="flex-1 px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
+                      >
+                        노쇼 처리
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
