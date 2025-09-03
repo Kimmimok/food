@@ -50,6 +50,31 @@ export default async function SalesReportsPage() {
 	const totalOrders = (daily as Row[]).reduce((s, r) => s + Number(r.orders || 0), 0)
 	const avgOrder = totalOrders ? Math.round(totalSales / totalOrders) : 0
 
+	// Compute the most recent day's paid-order totals (align with dashboard)
+	let dailyStat = { sales: 0, orders: 0, label: '-' }
+	if ((daily as Row[]).length) {
+		const rows = daily as Row[]
+		const last = rows[rows.length - 1]
+		try {
+			const d = new Date(last.sales_date)
+			const start = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+			const end = new Date(start)
+			end.setDate(end.getDate() + 1)
+			const { data: todays = [], error: e3 } = await supabase
+				.from('order_ticket')
+				.select('total')
+				.eq('status', 'paid')
+				.gte('created_at', start.toISOString())
+				.lt('created_at', end.toISOString())
+			if (e3) throw new Error(e3.message)
+			const sales = (todays as any[]).reduce((s, r) => s + (r.total || 0), 0)
+			const orders = (todays as any[]).length
+			dailyStat = { sales, orders, label: new Date(last.sales_date).toLocaleDateString('ko-KR') }
+		} catch (err) {
+			dailyStat = { sales: Number(last.total_sales || 0), orders: Number(last.orders || 0), label: new Date(last.sales_date).toLocaleDateString('ko-KR') }
+		}
+	}
+
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
@@ -95,11 +120,7 @@ export default async function SalesReportsPage() {
 						return { sales, orders }
 					}
 
-					const dailyStat = rows.length ? (() => {
-						// find most recent day's stats
-						const last = rows[rows.length - 1]
-						return { sales: Number(last.total_sales || 0), orders: Number(last.orders || 0), label: new Date(last.sales_date).toLocaleDateString('ko-KR') }
-					})() : { sales: 0, orders: 0, label: '-' }
+                    
 
 					const week = sumRange(7)
 					const month = sumRange(30)
