@@ -125,7 +125,11 @@ export default function KitchenBoard({
     function onLocalUpdate(e:any) {
       const { id, status } = e.detail || {}
       if (!id) return
-      setRows(prev => prev.map(r => r.id === id ? { ...r, status } : r))
+      setRows(prev => prev.map(r => {
+        // rows may be keyed by kitchen_queue.id OR by order_item.id depending on source
+        const matches = String(r.id) === String(id) || String(r.order_item?.id) === String(id)
+        return matches ? { ...r, status } : r
+      }))
     }
     window.addEventListener('kitchen:updated', onLocalUpdate)
     return () => window.removeEventListener('kitchen:updated', onLocalUpdate)

@@ -5,7 +5,7 @@ interface RefreshButtonProps {
   children: React.ReactNode
 }
 
-export default function RefreshButton({ className, children }: RefreshButtonProps) {
+export function RefreshButton({ className, children }: RefreshButtonProps) {
   const handleRefresh = () => {
     window.location.reload()
   }
@@ -19,3 +19,6 @@ export default function RefreshButton({ className, children }: RefreshButtonProp
     </button>
   )
 }
+
+// keep default export for existing default imports
+export default RefreshButton

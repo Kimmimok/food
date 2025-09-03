@@ -20,6 +20,19 @@ export default async function OrderQrPage({ params }: any) {
   const tableLabel = table?.label ?? `테이블 ${tableId}`
   const isValidTable = !!table
 
+  // 레스토랑 이름 조회 (상단에 표시)
+  let restaurantName = 'Restaurant'
+  try {
+    const { data: rs } = await supabase
+      .from('restaurant_settings')
+      .select('name')
+      .eq('id', 1)
+      .maybeSingle()
+    restaurantName = rs?.name ?? restaurantName
+  } catch (e) {
+    // ignore
+  }
+
   // 카테고리/메뉴 조회(판매중만)
   const { data: categories = [] } = await supabase
     .from('menu_category')
@@ -42,7 +55,7 @@ export default async function OrderQrPage({ params }: any) {
       <div className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-screen-sm mx-auto px-4 py-4">
           <div className="text-center space-y-2">
-            <h1 className="text-2xl font-bold text-gray-900">{tableLabel}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{restaurantName} ({tableLabel})</h1>
             <p className="text-base text-gray-600">메뉴를 선택하고 주문해보세요</p>
             {/* 테이블 미등록 경고 제거 (디자인 정리) */}
           </div>

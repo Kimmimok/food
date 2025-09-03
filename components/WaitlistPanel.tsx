@@ -21,6 +21,7 @@ type Table = { id: string; label: string; capacity: number; status: string }
 export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wait[]; tables: Table[] }) {
   const [rows, setRows] = useState<Wait[]>(initialRows)
   const [draft, setDraft] = useState({ name: '', phone: '', size: '2', note: '' })
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const tableMap = useMemo(() => Object.fromEntries(tables.map(t => [t.id, t.label])), [tables])
 
   // Realtime: waitlist 변경
@@ -63,14 +64,20 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
     <div className="space-y-6">
       {/* 등록 폼 */}
       <div className="bg-gray-50 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">새 웨이팅 등록</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">새 대기 등록</h3>
         <form
           onSubmit={async (e) => {
             e.preventDefault()
+            if (isSubmitting) return
             const size = Number(draft.size)
             if (!draft.name || !size) return alert('이름/인원수를 확인하세요.')
-            await addWait({ name: draft.name, phone: draft.phone || undefined, size, note: draft.note || undefined })
-            setDraft({ name: '', phone: '', size: '2', note: '' })
+            try {
+              setIsSubmitting(true)
+              await addWait({ name: draft.name, phone: draft.phone || undefined, size, note: draft.note || undefined })
+              setDraft({ name: '', phone: '', size: '2', note: '' })
+            } finally {
+              setIsSubmitting(false)
+            }
           }}
           className="grid gap-4 sm:grid-cols-5"
         >
@@ -114,40 +121,44 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
             />
           </div>
           <div className="flex items-end">
-            <button className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
-              등록하기
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? '등록 중...' : '등록하기'}
             </button>
           </div>
         </form>
       </div>
 
-      {/* 상단 요약 */}
+  {/* 상단 요약 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-orange-600">대기중</p>
-              <p className="text-2xl font-bold text-orange-900 mt-1">{waiting.length}팀</p>
+      <p className="text-sm font-medium text-orange-600">대기중</p>
+      <p className="text-2xl font-bold text-orange-900 mt-1">{waiting.length}팀</p>
             </div>
             <div className="text-2xl">⏰</div>
           </div>
         </div>
         
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-blue-600">호출됨</p>
-              <p className="text-2xl font-bold text-blue-900 mt-1">{called.length}팀</p>
+      <p className="text-sm font-medium text-blue-600">호출됨</p>
+      <p className="text-2xl font-bold text-blue-900 mt-1">{called.length}팀</p>
             </div>
             <div className="text-2xl">📢</div>
           </div>
         </div>
         
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-green-600">예상 대기</p>
-              <p className="text-2xl font-bold text-green-900 mt-1">{avgWaitMin}분</p>
+      <p className="text-sm font-medium text-green-600">예상 대기</p>
+      <p className="text-2xl font-bold text-green-900 mt-1">{avgWaitMin}분</p>
             </div>
             <div className="text-2xl">📊</div>
           </div>

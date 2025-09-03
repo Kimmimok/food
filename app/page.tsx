@@ -72,7 +72,7 @@ export default async function Page() {
   if (waitingTeams > 0) {
     notifications.push({
       type: 'warning' as const,
-      message: `웨이팅 팀이 ${waitingTeams}팀 있습니다.`,
+  message: `대기 팀이 ${waitingTeams}팀 있습니다.`,
       time: '실시간'
     })
   }
@@ -139,7 +139,7 @@ export default async function Page() {
           <QuickActionCard href="/tables" icon="🪑" label="테이블 관리" desc="좌석 현황 및 주문" />
           <QuickActionCard href="/menu" icon="📋" label="메뉴 관리" desc="메뉴 수정 및 가격" />
           <QuickActionCard href="/kitchen" icon="👨‍🍳" label="주방 화면" desc="주문 진행 상황" />
-          <QuickActionCard href="/waitlist" icon="⏰" label="웨이팅" desc="대기 고객 관리" />
+          <QuickActionCard href="/waitlist" icon="⏰" label="대기" desc="대기 고객 관리" />
           <QuickActionCard href="/cashier" icon="💳" label="계산대" desc="결제 및 정산" />
           <QuickActionCard href="/reports/sales" icon="📊" label="매출 분석" desc="일별 매출 리포트" />
         </div>

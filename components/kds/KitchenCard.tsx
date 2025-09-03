@@ -33,7 +33,9 @@ export default function KitchenCard({ q, tableLabelMap, station }: { q: KQueue, 
       await setKitchenStatus(id, 'in_progress')
       window.dispatchEvent(new CustomEvent('notify', { detail: { message: '조리 시작', type: 'success' } }))
       // optimistic UI: inform kitchen board to update this item immediately
-      window.dispatchEvent(new CustomEvent('kitchen:updated', { detail: { id, status: 'in_progress' } }))
+  window.dispatchEvent(new CustomEvent('kitchen:updated', { detail: { id, kqId: q.id, status: 'in_progress' } }))
+  // ensure canonical state is fetched if needed
+  setTimeout(() => window.location.reload(), 250)
     } catch (err:any) {
       window.dispatchEvent(new CustomEvent('notify', { detail: { message: '조리 시작 실패: '+(err?.message||String(err)), type: 'error' } }))
     } finally { 
@@ -48,7 +50,8 @@ export default function KitchenCard({ q, tableLabelMap, station }: { q: KQueue, 
       setLoadingDone(true)
       await setKitchenStatus(id, 'done')
       window.dispatchEvent(new CustomEvent('notify', { detail: { message: '완료 처리됨', type: 'success' } }))
-      window.dispatchEvent(new CustomEvent('kitchen:updated', { detail: { id, status: 'done' } }))
+  window.dispatchEvent(new CustomEvent('kitchen:updated', { detail: { id, kqId: q.id, status: 'done' } }))
+  setTimeout(() => window.location.reload(), 250)
     } catch (err:any) {
       window.dispatchEvent(new CustomEvent('notify', { detail: { message: '완료 처리 실패: '+(err?.message||String(err)), type: 'error' } }))
     } finally { 
@@ -63,7 +66,8 @@ export default function KitchenCard({ q, tableLabelMap, station }: { q: KQueue, 
       setLoadingServed(true)
       await setKitchenStatus(id, 'served')
       window.dispatchEvent(new CustomEvent('notify', { detail: { message: '서빙 완료 처리됨', type: 'success' } }))
-      window.dispatchEvent(new CustomEvent('kitchen:updated', { detail: { id, status: 'served' } }))
+  window.dispatchEvent(new CustomEvent('kitchen:updated', { detail: { id, kqId: q.id, status: 'served' } }))
+  setTimeout(() => window.location.reload(), 250)
     } catch (err:any) {
       window.dispatchEvent(new CustomEvent('notify', { detail: { message: '서빙 처리 실패: '+(err?.message||String(err)), type: 'error' } }))
     } finally { 
