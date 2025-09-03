@@ -21,6 +21,7 @@ export async function upsertMenuItem(payload: {
   name: string
   price: number
   category_id?: string | null
+  image_url?: string | null
   is_active?: boolean
 }) {
   await requireRole(['manager','admin'])
@@ -29,6 +30,7 @@ export async function upsertMenuItem(payload: {
     name: payload.name,
     price: payload.price,
     category_id: payload.category_id ?? null,
+  image_url: payload.image_url ?? null,
     is_active: payload.is_active ?? true,
   } as any
 

@@ -81,11 +81,24 @@ export default function MenuList({
 
   // 품절 토글(낙관적)
   const onToggle = async (id: string, next: boolean) => {
+    // Capture the previous snapshot so we can roll back exactly if needed
+    const prevSnapshot = (optimisticItems ?? items).map(i => ({ ...i }))
+
+    // Optimistic update (immediate UI feedback)
     setOptimisticItems(prev => prev.map(i => i.id === id ? { ...i, is_sold_out: next } : i))
-    await toggleSoldOut(id, next).catch(() => {
-      // 실패 시 롤백: 서버 revalidate로 보정되므로 여기선 토스트만
-      alert('품절 상태 변경 실패')
-    })
+
+    try {
+      await toggleSoldOut(id, next)
+      // On success, update the canonical items list to keep both sources in sync
+      setItems(prev => prev.map(i => i.id === id ? { ...i, is_sold_out: next } : i))
+      setOptimisticItems(prev => prev.map(i => i.id === id ? { ...i, is_sold_out: next } : i))
+    } catch (err: any) {
+      console.error('toggleSoldOut failed', err)
+      // rollback to the captured snapshot for both optimistic and canonical lists
+      setOptimisticItems(prevSnapshot)
+      setItems(prevSnapshot)
+      alert('품절 상태 변경 실패: ' + (err?.message ?? String(err)))
+    }
   }
 
   // 신규/수정 저장
@@ -96,17 +109,30 @@ export default function MenuList({
 
   const onDelete = async (id: string) => {
     if (!confirm('이 메뉴를 삭제할까요?')) return
-    // 낙관적 제거 - startTransition으로 감싸기
+
+    // Capture previous snapshot to allow exact rollback
+    const prevSnapshot = (optimisticItems ?? items).map(i => ({ ...i }))
+    const filtered = prevSnapshot.filter(i => i.id !== id)
+
+    // Optimistically remove from UI
     startTransition(() => {
-      setOptimisticItems(prev => prev.filter(i => i.id !== id))
+      setOptimisticItems(filtered)
     })
-    await deleteMenuItem(id).catch((error) => {
-      alert('삭제 실패: ' + error.message)
-      // 실패 시 롤백
+
+    try {
+      await deleteMenuItem(id)
+      // On success, keep canonical items in sync
+      setItems(filtered)
+      setOptimisticItems(filtered)
+    } catch (error: any) {
+      console.error('deleteMenuItem failed', error)
+      alert('삭제 실패: ' + (error?.message ?? String(error)))
+      // Rollback both optimistic and canonical lists
       startTransition(() => {
-        setOptimisticItems(prev => [...prev]) // re-render trigger
+        setOptimisticItems(prevSnapshot)
       })
-    })
+      setItems(prevSnapshot)
+    }
   }
 
   // 간단 정렬(위/아래)
@@ -128,8 +154,8 @@ export default function MenuList({
   }
 
   // 신규 생성용 폼
-  const [draft, setDraft] = useState<{ name: string; price: string; category_id: string | ''; file?: File | null }>(
-    { name: '', price: '', category_id: '', file: null }
+  const [draft, setDraft] = useState<{ name: string; price: string; category_id: string | ''; image_url?: string | null }>(
+    { name: '', price: '', category_id: '', image_url: null }
   )
 
   return (
@@ -158,18 +184,12 @@ export default function MenuList({
               price: priceNum,
               category_id: draft.category_id || null,
             })
-            // 새 항목 생성 직후 이미지가 있다면 업로드 처리
-            if (result?.id && draft.file) {
+            // 새 항목 생성 직후 image_url이 제공되면 바로 DB에 저장
+            if (result?.id && draft.image_url) {
               try {
-                const client = supabase()
-                const file = draft.file
-                const path = `${result.id}/${Date.now()}_${file.name}`
-                const { error: upErr } = await client.storage.from('menu-images').upload(path, file, { upsert: true, contentType: file.type })
-                if (upErr) throw upErr
-                const { data: pub } = client.storage.from('menu-images').getPublicUrl(path)
-                await setMenuItemImage(result.id, pub.publicUrl)
+                await setMenuItemImage(result.id, draft.image_url)
               } catch (e:any) {
-                alert('이미지 업로드 실패: ' + e.message)
+                alert('이미지 저장 실패: ' + e.message)
               }
             }
             setDraft({ name: '', price: '', category_id: '', file: null })
@@ -198,11 +218,10 @@ export default function MenuList({
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={e => setDraft(s => ({ ...s, file: e.target.files?.[0] ?? null }))}
-            className="border rounded px-3 py-2 text-sm"
+            value={draft.image_url ?? ''}
+            onChange={e => setDraft(s => ({ ...s, image_url: e.target.value }))}
+            placeholder="이미지 경로 (예: /images/menu1.png)"
+            className="border rounded px-3 py-2 text-sm w-full"
           />
           <button className="px-3 py-2 rounded bg-black text-white text-sm">추가</button>
   </form>

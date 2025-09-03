@@ -15,14 +15,14 @@ public,kitchen_queue,done_at,timestamp with time zone,null,null,null,YES,null,NO
 public,menu_category,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
 public,menu_category,name,text,null,null,null,NO,null,NO,NO,null,null
 public,menu_category,sort_order,integer,null,32,0,NO,0,NO,NO,null,null
-public,menu_category,is_active,boolean,null,null,null,NO,true,NO,NO,null,null
+public,menu_category,is_active,boolean,null,null,null,NO,TRUE,NO,NO,null,null
 public,menu_item,id,uuid,null,null,null,NO,gen_random_uuid(),YES,NO,null,null
 public,menu_item,category_id,uuid,null,null,null,YES,null,NO,YES,menu_category,id
 public,menu_item,name,text,null,null,null,NO,null,NO,NO,null,null
 public,menu_item,price,numeric,null,null,null,NO,null,NO,NO,null,null
 public,menu_item,sku,text,null,null,null,YES,null,NO,NO,null,null
-public,menu_item,is_sold_out,boolean,null,null,null,NO,false,NO,NO,null,null
-public,menu_item,is_active,boolean,null,null,null,NO,true,NO,NO,null,null
+public,menu_item,is_sold_out,boolean,null,null,null,NO,FALSE,NO,NO,null,null
+public,menu_item,is_active,boolean,null,null,null,NO,TRUE,NO,NO,null,null
 public,menu_item,sort_order,integer,null,32,0,NO,0,NO,NO,null,null
 public,menu_item,created_at,timestamp with time zone,null,null,null,YES,now(),NO,NO,null,null
 public,menu_item,image_url,text,null,null,null,YES,null,NO,NO,null,null
