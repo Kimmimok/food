@@ -35,7 +35,7 @@ function CategoryTabs({ categories, activeCategory, onCategoryChange }: any) {
   )
 }
 
-function OrderHistoryModal({ cart, isOpen, onClose, tableId }: { cart: any[], isOpen: boolean, onClose: () => void, tableId: string }) {
+function OrderHistoryModal({ cart, setCart, isOpen, onClose, tableId }: { cart: any[], setCart: React.Dispatch<React.SetStateAction<any[]>>, isOpen: boolean, onClose: () => void, tableId: string }) {
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [isCompleted, setIsCompleted] = React.useState(false)
 
@@ -125,6 +125,17 @@ function OrderHistoryModal({ cart, isOpen, onClose, tableId }: { cart: any[], is
                       <p className="font-semibold text-blue-600">₩{(item.price * item.quantity).toLocaleString()}</p>
                     </div>
                   </div>
+                  <div className="mt-2 flex items-center">
+                    <button
+                      onClick={() => {
+                        if (isSubmitting) return
+                        setCart((prev: any[]) => prev.filter(i => i.id !== item.id))
+                      }}
+                      className="ml-auto px-2 py-1 border rounded text-sm text-red-600"
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
               ))}
 
@@ -180,11 +191,12 @@ export default function ClientOrderPanel({ tableId, categories, items }: any) {
     <>
       <div className="space-y-6 py-6">
         <CategoryTabs categories={categories} activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
-        <MenuGrid items={items} activeCategory={activeCategory} cart={cart} setCart={setCart} />
+  <MenuGrid items={items} activeCategory={activeCategory} cart={cart} setCart={setCart} categories={categories} />
       </div>
 
       <OrderHistoryModal
         cart={cart}
+        setCart={setCart}
         isOpen={showOrderHistory}
         onClose={() => setShowOrderHistory(false)}
         tableId={tableId}

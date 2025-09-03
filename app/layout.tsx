@@ -3,6 +3,7 @@ import { getUserAndRole } from '@/lib/auth'
 import LogoutButton from '@/components/LogoutButton'
 import { supabaseServer } from '@/lib/supabase-server'
 import Toasts from '@/components/Toast'
+import SoundAlerts from '@/components/SoundAlerts'
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { user, role } = await getUserAndRole()
@@ -85,6 +86,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="flex-1 overflow-auto p-6 bg-gray-50">
                 {children}
                 <Toasts />
+                {/* 브라우저 자동재생 정책을 준수하기 위한 사용자 활성화형 사운드 알림 */}
+                <SoundAlerts />
               </div>
             </main>
           </div>
