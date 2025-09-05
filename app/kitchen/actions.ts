@@ -21,85 +21,81 @@ async function sb() {
 type KStatus = 'queued' | 'in_progress' | 'done' | 'served'
 
 /** 주방 상태 전이 + order_item.status 동기화 */
-export async function setKitchenStatus(orderItemId: string, next: KStatus) {
+export async function setKitchenStatus(queueId: string, next: KStatus) {
   const supabase = await sb()
+
+  const now = new Date().toISOString()
+  const patch: any = { status: next }
+  if (next === 'in_progress') patch.started_at = now
+  if (next === 'done') patch.done_at = now
+
+  const { data: q, error: e1 } = await supabase
+    .from('kitchen_queue')
+    .update(patch)
+    .eq('id', queueId)
+    .select('order_item_id')
+    .single()
+  if (e1) throw new Error(e1.message)
+
+  // order_item 상태도 동기화
   const map: Record<KStatus, string> = {
     queued: 'queued',
     in_progress: 'in_progress',
     done: 'done',
     served: 'served',
   }
-  const { error } = await supabase
+  const { error: e2 } = await supabase
     .from('order_item')
     .update({ status: map[next] })
-    .eq('id', orderItemId)
-  if (error) throw new Error(error.message)
-  
-  // Also update kitchen_queue if it exists for this order_item
-  const { error: kqError } = await supabase
-    .from('kitchen_queue')
-    .update({ status: map[next] })
-    .eq('order_item_id', orderItemId)
-  // Ignore error if kitchen_queue row doesn't exist
-  
+    .eq('id', q.order_item_id)
+  if (e2) throw new Error(e2.message)
+
   revalidatePath('/kitchen')
-  revalidatePath('/kitchen/[station]', 'page')
-  revalidatePath('/serving')
-  revalidatePath('/serving/[station]', 'page')
-  revalidatePath('/cashier')
 }
 
 /** 스테이션의 미완료 티켓을 일괄 완료 처리 */
 export async function bulkMarkDone(station: string) {
   const supabase = await sb()
+  const now = new Date().toISOString()
+  const { data: rows, error: e1 } = await supabase
+    .from('kitchen_queue')
+    .update({ status: 'done', done_at: now })
+    .eq('station', station)
+    .in('status', ['queued', 'in_progress'])
+    .select('order_item_id')
+  if (e1) throw new Error(e1.message)
 
-  // find order_items by station
-  const { data: items = [], error: e } = await supabase
-    .from('order_item')
-    .select('id, menu_item:menu_item_id(id, station), status')
-  if (e) throw new Error(e.message)
-  const ids = items.filter((it:any)=> {
-    const itemStation = it.menu_item?.station || 'main'
-    // beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
-    const effectiveStation = itemStation === 'bar' ? 'beverages' : itemStation
-    return effectiveStation === station && ['queued','in_progress'].includes(it.status)
-  }).map((it:any)=>it.id)
-  if (ids.length) {
-    await supabase.from('order_item').update({ status: 'done' }).in('id', ids)
-    // Also update kitchen_queue
-    await supabase.from('kitchen_queue').update({ status: 'done' }).in('order_item_id', ids)
+  if (rows?.length) {
+    const ids = rows.map(r => r.order_item_id)
+    const { error: e2 } = await supabase
+      .from('order_item')
+      .update({ status: 'done' })
+      .in('id', ids)
+    if (e2) throw new Error(e2.message)
   }
+
   revalidatePath(`/kitchen/${station}`)
-  revalidatePath(`/serving/${station}`)
-  revalidatePath('/kitchen')
-  revalidatePath('/serving')
-  revalidatePath('/cashier')
-  revalidatePath('/tables')
 }
 
 /** 완료된 것을 서빙완료 처리 */
 export async function bulkMarkServed(station: string) {
   const supabase = await sb()
+  const { data: rows, error: e1 } = await supabase
+    .from('kitchen_queue')
+    .update({ status: 'served' })
+    .eq('station', station)
+    .eq('status', 'done')
+    .select('order_item_id')
+  if (e1) throw new Error(e1.message)
 
-  const { data: items = [], error: e } = await supabase
-    .from('order_item')
-    .select('id, menu_item:menu_item_id(id, station), status')
-  if (e) throw new Error(e.message)
-  const ids = items.filter((it:any)=> {
-    const itemStation = it.menu_item?.station || 'main'
-    // beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
-    const effectiveStation = itemStation === 'bar' ? 'beverages' : itemStation
-    return effectiveStation === station && it.status === 'done'
-  }).map((it:any)=>it.id)
-  if (ids.length) {
-    await supabase.from('order_item').update({ status: 'served' }).in('id', ids)
-    // Also update kitchen_queue
-    await supabase.from('kitchen_queue').update({ status: 'served' }).in('order_item_id', ids)
+  if (rows?.length) {
+    const ids = rows.map(r => r.order_item_id)
+    const { error: e2 } = await supabase
+      .from('order_item')
+      .update({ status: 'served' })
+      .in('id', ids)
+    if (e2) throw new Error(e2.message)
   }
+
   revalidatePath(`/kitchen/${station}`)
-  revalidatePath(`/serving/${station}`)
-  revalidatePath('/kitchen')
-  revalidatePath('/serving')
-  revalidatePath('/cashier')
-  revalidatePath('/tables')
 }

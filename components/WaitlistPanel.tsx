@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase-client'
-import { addWait, callWait, seatWait, cancelWait, noShowWait, expireCalled5 } from '@/app/waitlist/actions'
+import { addWait, callWait, seatWait, cancelWait, noShowWait, expireCalledOlderThan } from '@/app/waitlist/actions'
 
 type Wait = {
   id: string
@@ -21,8 +21,6 @@ type Table = { id: string; label: string; capacity: number; status: string }
 export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wait[]; tables: Table[] }) {
   const [rows, setRows] = useState<Wait[]>(initialRows)
   const [draft, setDraft] = useState({ name: '', phone: '', size: '2', note: '' })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [userRole, setUserRole] = useState<'guest'|'member'|'manager'|'admin'>('guest')
   const tableMap = useMemo(() => Object.fromEntries(tables.map(t => [t.id, t.label])), [tables])
 
   // Realtime: waitlist 변경
@@ -53,18 +51,6 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
     return () => { client.removeChannel(ch) }
   }, [])
 
-  // 사용자 역할 확인 (매니저/어드민 여부)
-  useEffect(() => {
-    const client = supabase()
-    client.auth.getUser().then(({ data }) => {
-      const user = data?.user ?? null
-      if (!user) return setUserRole('guest')
-      client.from('user_profile').select('role').eq('id', user.id).maybeSingle().then(({ data: p }) => {
-        setUserRole((p?.role as any) ?? 'member')
-      }).catch(() => setUserRole('member'))
-    })
-  }, [])
-
   const waiting = rows.filter(r => r.status === 'waiting')
   const called = rows.filter(r => r.status === 'called')
 
@@ -77,20 +63,14 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
     <div className="space-y-6">
       {/* 등록 폼 */}
       <div className="bg-gray-50 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">새 대기 등록</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">새 웨이팅 등록</h3>
         <form
           onSubmit={async (e) => {
             e.preventDefault()
-            if (isSubmitting) return
             const size = Number(draft.size)
             if (!draft.name || !size) return alert('이름/인원수를 확인하세요.')
-            try {
-              setIsSubmitting(true)
-              await addWait({ name: draft.name, phone: draft.phone || undefined, size, note: draft.note || undefined })
-              setDraft({ name: '', phone: '', size: '2', note: '' })
-            } finally {
-              setIsSubmitting(false)
-            }
+            await addWait({ name: draft.name, phone: draft.phone || undefined, size, note: draft.note || undefined })
+            setDraft({ name: '', phone: '', size: '2', note: '' })
           }}
           className="grid gap-4 sm:grid-cols-5"
         >
@@ -134,60 +114,54 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
             />
           </div>
           <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? '등록 중...' : '등록하기'}
+            <button className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
+              등록하기
             </button>
           </div>
         </form>
       </div>
 
-  {/* 상단 요약 */}
+      {/* 상단 요약 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-      <p className="text-sm font-medium text-orange-600">대기중</p>
-      <p className="text-2xl font-bold text-orange-900 mt-1">{waiting.length}팀</p>
+              <p className="text-sm font-medium text-orange-600">대기중</p>
+              <p className="text-2xl font-bold text-orange-900 mt-1">{waiting.length}팀</p>
             </div>
             <div className="text-2xl">⏰</div>
           </div>
         </div>
         
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-      <p className="text-sm font-medium text-blue-600">호출됨</p>
-      <p className="text-2xl font-bold text-blue-900 mt-1">{called.length}팀</p>
+              <p className="text-sm font-medium text-blue-600">호출됨</p>
+              <p className="text-2xl font-bold text-blue-900 mt-1">{called.length}팀</p>
             </div>
             <div className="text-2xl">📢</div>
           </div>
         </div>
         
-    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-      <p className="text-sm font-medium text-green-600">예상 대기</p>
-      <p className="text-2xl font-bold text-green-900 mt-1">{avgWaitMin}분</p>
+              <p className="text-sm font-medium text-green-600">예상 대기</p>
+              <p className="text-2xl font-bold text-green-900 mt-1">{avgWaitMin}분</p>
             </div>
             <div className="text-2xl">📊</div>
           </div>
         </div>
         
-        { (userRole === 'manager' || userRole === 'admin') && (
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <form action={expireCalled5}>
-              <button className="w-full h-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors">
-                호출 만료 처리
-                <br />
-                <span className="text-xs">(5분 기준)</span>
-              </button>
-            </form>
-          </div>
-        )}
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <form action={async () => { 'use server'; await expireCalledOlderThan(5) }}>
+            <button className="w-full h-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors">
+              호출 만료 처리
+              <br />
+              <span className="text-xs">(5분 기준)</span>
+            </button>
+          </form>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -229,22 +203,18 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                   >
                     📢 호출
                   </button>
-                  {(userRole === 'manager' || userRole === 'admin') && (
-                    <>
-                      <button 
-                        onClick={() => cancelWait(w.id)} 
-                        className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-                      >
-                        취소
-                      </button>
-                      <button 
-                        onClick={() => noShowWait(w.id)} 
-                        className="px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
-                      >
-                        노쇼
-                      </button>
-                    </>
-                  )}
+                  <button 
+                    onClick={() => cancelWait(w.id)} 
+                    className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button 
+                    onClick={() => noShowWait(w.id)} 
+                    className="px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
+                  >
+                    노쇼
+                  </button>
                 </div>
               </div>
             ))}
@@ -289,22 +259,18 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                 </div>
                 
                 <div className="flex gap-2">
-                  {(userRole === 'manager' || userRole === 'admin') && (
-                    <>
-                      <button 
-                        onClick={() => cancelWait(w.id)} 
-                        className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-                      >
-                        취소
-                      </button>
-                      <button 
-                        onClick={() => noShowWait(w.id)} 
-                        className="flex-1 px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
-                      >
-                        노쇼 처리
-                      </button>
-                    </>
-                  )}
+                  <button 
+                    onClick={() => cancelWait(w.id)} 
+                    className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button 
+                    onClick={() => noShowWait(w.id)} 
+                    className="flex-1 px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
+                  >
+                    노쇼 처리
+                  </button>
                 </div>
               </div>
             ))}

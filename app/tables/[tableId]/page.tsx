@@ -1,14 +1,24 @@
 // @ts-nocheck
 import { cookies, headers } from 'next/headers'
-import { supabaseServer } from '@/lib/supabase-server'
+import { createServerClient } from '@supabase/ssr'
 import OrderBuilder from '@/components/orders/OrderBuilder'
 import OrderItemsPanel from '@/components/orders/OrderItemsPanel'
 import { seatTableAndOpenOrder } from '../actions'
 
+function supabaseServer() {
+  const cookieStore = cookies()
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: { get(name: string) { return cookieStore.get(name)?.value } },
+      headers: { get(name: string) { return headers().get(name) } }
+    }
+  )
+}
 
-
-export default async function TableDetailPage({ params }: any) {
-  const supabase = await supabaseServer()
+export default async function TableDetailPage({ params }: { params: { tableId: string } }) {
+  const supabase = supabaseServer()
 
   // 테이블 정보
   const { data: table } = await supabase

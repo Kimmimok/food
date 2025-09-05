@@ -1,13 +1,13 @@
 // @ts-nocheck
 'use client'
 
-import { useEffect, useMemo, useOptimistic, useState, startTransition } from 'react'
+import { useEffect, useMemo, useOptimistic, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { toggleSoldOut, upsertMenuItem, deleteMenuItem, reorderMenuItems, setMenuItemImage } from '@/app/menu/actions'
+import { toggleSoldOut, upsertMenuItem, deleteMenuItem, reorderMenuItems } from '@/app/menu/actions'
 import ItemCard from '@/components/ItemCard'
 import { supabase } from '@/lib/supabase-client'
 
-type Category = { id: string; name: string; sort_order: number }
+type Category = { id: string; name: string }
 type Item = {
   id: string
   name: string
@@ -15,7 +15,6 @@ type Item = {
   category_id: string | null
   is_sold_out: boolean
   sort_order: number
-  image_url?: string | null
 }
 
 export default function MenuList({
@@ -25,18 +24,6 @@ export default function MenuList({
   categories: Category[]
   initialItems: Item[]
 }) {
-  const [role, setRole] = useState<'guest'|'member'|'manager'|'admin'>('guest')
-  useEffect(() => {
-    const client = supabase()
-    client.auth.getUser().then(({ data }) => {
-      const user = data?.user ?? null
-      if (!user) return setRole('guest')
-      // fetch profile role (if exists)
-      client.from('user_profile').select('role').eq('id', user.id).maybeSingle().then(({ data: p }) => {
-        setRole((p?.role as any) ?? 'member')
-      }).catch(() => setRole('member'))
-    })
-  }, [])
   const params = useSearchParams()
   const currentCat = params.get('cat') ?? 'all'
 
@@ -81,58 +68,23 @@ export default function MenuList({
 
   // 품절 토글(낙관적)
   const onToggle = async (id: string, next: boolean) => {
-    // Capture the previous snapshot so we can roll back exactly if needed
-    const prevSnapshot = (optimisticItems ?? items).map(i => ({ ...i }))
-
-    // Optimistic update (immediate UI feedback)
     setOptimisticItems(prev => prev.map(i => i.id === id ? { ...i, is_sold_out: next } : i))
-
-    try {
-      await toggleSoldOut(id, next)
-      // On success, update the canonical items list to keep both sources in sync
-      setItems(prev => prev.map(i => i.id === id ? { ...i, is_sold_out: next } : i))
-      setOptimisticItems(prev => prev.map(i => i.id === id ? { ...i, is_sold_out: next } : i))
-    } catch (err: any) {
-      console.error('toggleSoldOut failed', err)
-      // rollback to the captured snapshot for both optimistic and canonical lists
-      setOptimisticItems(prevSnapshot)
-      setItems(prevSnapshot)
-      alert('품절 상태 변경 실패: ' + (err?.message ?? String(err)))
-    }
+    await toggleSoldOut(id, next).catch(() => {
+      // 실패 시 롤백: 서버 revalidate로 보정되므로 여기선 토스트만
+      alert('품절 상태 변경 실패')
+    })
   }
 
   // 신규/수정 저장
   const onSave = async (form: { id?: string; name: string; price: number; category_id?: string | null }) => {
-    const res = await upsertMenuItem(form as any).catch(e => { alert(e.message); return null })
-    return res
+    await upsertMenuItem(form as any).catch(e => alert(e.message))
   }
 
   const onDelete = async (id: string) => {
     if (!confirm('이 메뉴를 삭제할까요?')) return
-
-    // Capture previous snapshot to allow exact rollback
-    const prevSnapshot = (optimisticItems ?? items).map(i => ({ ...i }))
-    const filtered = prevSnapshot.filter(i => i.id !== id)
-
-    // Optimistically remove from UI
-    startTransition(() => {
-      setOptimisticItems(filtered)
-    })
-
-    try {
-      await deleteMenuItem(id)
-      // On success, keep canonical items in sync
-      setItems(filtered)
-      setOptimisticItems(filtered)
-    } catch (error: any) {
-      console.error('deleteMenuItem failed', error)
-      alert('삭제 실패: ' + (error?.message ?? String(error)))
-      // Rollback both optimistic and canonical lists
-      startTransition(() => {
-        setOptimisticItems(prevSnapshot)
-      })
-      setItems(prevSnapshot)
-    }
+    // 낙관적 제거
+    setOptimisticItems(prev => prev.filter(i => i.id !== id))
+    await deleteMenuItem(id).catch(() => alert('삭제 실패'))
   }
 
   // 간단 정렬(위/아래)
@@ -154,8 +106,8 @@ export default function MenuList({
   }
 
   // 신규 생성용 폼
-  const [draft, setDraft] = useState<{ name: string; price: string; category_id: string | ''; image_url?: string | null }>(
-    { name: '', price: '', category_id: '', image_url: null }
+  const [draft, setDraft] = useState<{ name: string; price: string; category_id: string | '' }>(
+    { name: '', price: '', category_id: '' }
   )
 
   return (
@@ -173,26 +125,17 @@ export default function MenuList({
           </button>
         </div>
 
-  { (role === 'manager' || role === 'admin') && (
-  <form
+        <form
           onSubmit={async (e) => {
             e.preventDefault()
             const priceNum = Number(draft.price)
             if (!draft.name || Number.isNaN(priceNum)) return alert('이름/가격을 확인하세요.')
-            const result = await onSave({
+            await onSave({
               name: draft.name,
               price: priceNum,
               category_id: draft.category_id || null,
             })
-            // 새 항목 생성 직후 image_url이 제공되면 바로 DB에 저장
-            if (result?.id && draft.image_url) {
-              try {
-                await setMenuItemImage(result.id, draft.image_url)
-              } catch (e:any) {
-                alert('이미지 저장 실패: ' + e.message)
-              }
-            }
-            setDraft({ name: '', price: '', category_id: '', file: null })
+            setDraft({ name: '', price: '', category_id: '' })
           }}
           className="flex flex-wrap gap-2"
         >
@@ -217,28 +160,18 @@ export default function MenuList({
             <option value="">카테고리(선택)</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <input
-            value={draft.image_url ?? ''}
-            onChange={e => setDraft(s => ({ ...s, image_url: e.target.value }))}
-            placeholder="이미지 경로 (예: /images/menu1.png)"
-            className="border rounded px-3 py-2 text-sm w-full"
-          />
           <button className="px-3 py-2 rounded bg-black text-white text-sm">추가</button>
-  </form>
-  )}
+        </form>
       </div>
 
-      <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {filtered.map(item => (
           <li key={item.id}>
             <ItemCard
               item={item}
               categories={categories}
               onToggleSoldOut={onToggle}
-              onSave={async (form) => {
-                const res = await onSave(form)
-                return res
-              }}
+              onSave={onSave}
               onDelete={() => onDelete(item.id)}
               onMoveUp={() => move(item.id, -1)}
               onMoveDown={() => move(item.id, +1)}

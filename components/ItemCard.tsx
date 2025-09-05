@@ -1,9 +1,7 @@
 // @ts-nocheck
-"use client"
+'use client'
 
 import { useState } from 'react'
-import NextImage from 'next/image'
-import { setMenuItemImage } from '@/app/menu/actions'
 
 type Category = { id: string; name: string }
 type Item = {
@@ -12,7 +10,6 @@ type Item = {
   price: number
   category_id: string | null
   is_sold_out: boolean
-  image_url?: string | null
 }
 
 export default function ItemCard({
@@ -36,34 +33,11 @@ export default function ItemCard({
   const [name, setName] = useState(item.name)
   const [price, setPrice] = useState(String(item.price))
   const [categoryId, setCategoryId] = useState(item.category_id ?? '')
-  const [img, setImg] = useState<string | null>(item.image_url ?? null)
-
-  const removeImage = async () => {
-    try {
-      await setMenuItemImage(item.id, null)
-      setImg(null)
-    } catch (e:any) {
-      alert('이미지 제거 실패: ' + e.message)
-    }
-  }
-
-  const applyImageUrl = async () => {
-    try {
-      // img may be null or string; if empty string treat as null
-      const url = img && img.trim() !== '' ? img : null
-      await setMenuItemImage(item.id, url)
-      setImg(url)
-      alert('이미지 경로가 저장되었습니다.')
-    } catch (e:any) {
-      console.error('applyImageUrl failed', e)
-      alert('이미지 저장 실패: ' + (e?.message ?? String(e)))
-    }
-  }
 
   const commit = async () => {
     const priceNum = Number(price)
     if (!name || Number.isNaN(priceNum)) return alert('이름/가격을 확인하세요.')
-    await onSave({ id: item.id, name, price: priceNum, category_id: categoryId || null, image_url: img ?? null } as any)
+    await onSave({ id: item.id, name, price: priceNum, category_id: categoryId || null })
     setEditing(false)
   }
 
@@ -83,15 +57,9 @@ export default function ItemCard({
             </span>
           </div>
 
-          {img && (
-            <div className="mt-2 relative w-full h-36">
-              <NextImage src={img} alt={item.name} fill className="object-cover rounded" sizes="(max-width: 768px) 100vw, 33vw" priority />
-            </div>
-          )}
-
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button onClick={() => onToggleSoldOut(item.id, !item.is_sold_out)} className="px-3 py-2 rounded border text-sm hover:bg-muted">
-              {item.is_sold_out ? '품절 해제' : '품절 처리'}
+              {item.is_sold_out ? '판매 재개' : '품절 처리'}
             </button>
             <button onClick={() => setEditing(true)} className="px-3 py-2 rounded border text-sm hover:bg-muted">
               수정
@@ -112,21 +80,6 @@ export default function ItemCard({
               <option value="">무카테고리</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            {img && (
-              <div className="relative w-full h-36">
-                <NextImage src={img} alt="preview" fill className="object-cover rounded" sizes="(max-width: 768px) 100vw, 33vw" />
-              </div>
-            )}
-            <div className="flex gap-2 items-center">
-              <input
-                value={img ?? ''}
-                onChange={e => setImg(e.target.value || null)}
-                placeholder="이미지 경로 (예: /images/menu1.png)"
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-              <button type="button" onClick={applyImageUrl} className="px-3 py-2 rounded border text-sm">적용</button>
-              {img && <button type="button" onClick={removeImage} className="px-3 py-2 rounded border text-sm">사진 제거</button>}
-            </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button onClick={commit} className="px-3 py-2 rounded bg-black text-white text-sm">저장</button>
