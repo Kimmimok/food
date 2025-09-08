@@ -51,4 +51,6 @@ export async function payOrder({
 
   revalidatePath('/cashier')
   revalidatePath('/tables')
+  revalidatePath('/kitchen')
+  revalidatePath('/serving')
 }

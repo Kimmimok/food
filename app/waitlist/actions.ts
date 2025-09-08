@@ -39,7 +39,7 @@ export async function callWait(id: string) {
   revalidatePath('/waitlist')
 }
 
-/** 좌석 배정: 웨이팅 → 테이블 상태 seated, 웨이팅 seated 처리 */
+/** 좌석 배정: 대기 → 테이블 상태 seated, 대기 seated 처리 */
 export async function seatWait({
   waitId, tableId
 }: { waitId: string; tableId: string }) {
@@ -51,7 +51,7 @@ export async function seatWait({
     .eq('id', tableId)
   if (e1) throw new Error(e1.message)
 
-  // 2) 웨이팅 seated 처리
+  // 2) 대기 seated 처리
   const { error: e2 } = await supabase
     .from('waitlist')
     .update({ status: 'seated', seated_table_id: tableId })
@@ -85,7 +85,29 @@ export async function noShowWait(id: string) {
 /** 자동 만료(호출 후 5분 지나면 waiting으로 되돌리거나 no_show로 표기하고 싶다면) */
 export async function expireCalledOlderThan(minutes = 5) {
   const supabase = await sb()
-  const { error } = await supabase.rpc('fn_waitlist_expire_called', { p_minutes: minutes })
-  if (error) throw new Error(error.message)
+  try {
+    const { error } = await supabase.rpc('fn_waitlist_expire_called', { p_minutes: minutes })
+    if (error) throw error
+  } catch (err) {
+    // If RPC does not exist or fails, fallback to a direct update:
+    // Set status back to 'waiting' for rows in 'called' older than minutes.
+    try {
+      const cutoff = new Date(Date.now() - minutes * 60 * 1000).toISOString()
+      const { error: e2 } = await supabase
+        .from('waitlist')
+        .update({ status: 'waiting' })
+        .lt('called_at', cutoff)
+        .eq('status', 'called')
+      if (e2) throw e2
+    } catch (e) {
+      // If even fallback fails, surface the original error
+      throw new Error(err?.message || e?.message || 'expireCalledOlderThan failed')
+    }
+  }
   revalidatePath('/waitlist')
+}
+
+// Small server-action wrapper for client components (pre-bound 5 minutes)
+export async function expireCalled5() {
+  return await expireCalledOlderThan(5)
 }

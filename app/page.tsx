@@ -1,4 +1,98 @@
-﻿export default function Page() {
+﻿import { requireRole } from '@/lib/auth'
+import { supabaseServer } from '@/lib/supabase-server'
+
+export default async function Page() {
+  await requireRole(['member','manager','admin'])
+  
+  const supabase = await supabaseServer()
+  
+  // 오늘 매출 계산
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  
+  const { data: todayOrders } = await supabase
+    .from('order_ticket')
+    .select('total')
+    .eq('status', 'paid')
+    .gte('created_at', today.toISOString())
+    .lt('created_at', tomorrow.toISOString())
+  
+  const todaySales = todayOrders?.reduce((sum, order) => sum + (order.total || 0), 0) || 0
+  
+  // 진행중 주문 수
+  const { data: activeOrders } = await supabase
+    .from('order_ticket')
+    .select('id')
+    .in('status', ['open', 'sent_to_kitchen'])
+  
+  const activeOrderCount = activeOrders?.length || 0
+  
+  // 대기 팀 수
+  const { data: waitlist } = await supabase
+    .from('waitlist')
+    .select('id')
+    .eq('status', 'waiting')
+  
+  const waitingTeams = waitlist?.length || 0
+  
+  // 사용중 테이블 수
+  const { data: tables } = await supabase
+    .from('dining_table')
+    .select('id, status')
+  
+  const totalTables = tables?.length || 0
+  const occupiedTables = tables?.filter(table => table.status === 'occupied').length || 0
+  
+  // 최근 주문
+  const { data: recentOrders } = await supabase
+    .from('order_ticket')
+    .select(`
+      id, created_at, status,
+      dining_table (label),
+      order_item (
+        id, name_snapshot, qty
+      )
+    `)
+    .order('created_at', { ascending: false })
+    .limit(5)
+  
+  // 최근 알림 (실제로는 알림 테이블이 없으므로 주문 기반으로 생성)
+  const notifications: Array<{type: 'info' | 'warning' | 'success', message: string, time: string}> = []
+  
+  if (activeOrderCount > 0) {
+    notifications.push({
+      type: 'info' as const,
+      message: `진행중인 주문이 ${activeOrderCount}건 있습니다.`,
+      time: '실시간'
+    })
+  }
+  
+  if (waitingTeams > 0) {
+    notifications.push({
+      type: 'warning' as const,
+  message: `대기 팀이 ${waitingTeams}팀 있습니다.`,
+      time: '실시간'
+    })
+  }
+  
+  if (todaySales > 0) {
+    notifications.push({
+      type: 'success' as const,
+      message: `오늘 매출: ₩${todaySales.toLocaleString()}`,
+      time: '실시간'
+    })
+  }
+  
+  // 기본 알림들 추가
+  if (notifications.length === 0) {
+    notifications.push({
+      type: 'info' as const,
+      message: '모든 시스템이 정상 작동중입니다.',
+      time: '방금 전'
+    })
+  }
   return (
     <div className="space-y-6">
       <div>
@@ -10,30 +104,30 @@
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatusCard 
           title="오늘 매출" 
-          value="₩1,250,000" 
+          value={`₩${todaySales.toLocaleString()}`} 
           icon="💰" 
-          trend="+12.5%" 
+          trend="실시간" 
           color="green" 
         />
         <StatusCard 
           title="진행중 주문" 
-          value="8건" 
+          value={`${activeOrderCount}건`} 
           icon="🍽️" 
           trend="실시간" 
           color="blue" 
         />
         <StatusCard 
           title="대기 팀" 
-          value="3팀" 
+          value={`${waitingTeams}팀`} 
           icon="⏰" 
-          trend="평균 15분" 
+          trend="실시간" 
           color="orange" 
         />
         <StatusCard 
           title="사용중 테이블" 
-          value="12/16" 
+          value={`${occupiedTables}/${totalTables}`} 
           icon="🪑" 
-          trend="75% 가동" 
+          trend={`${Math.round((occupiedTables / totalTables) * 100) || 0}% 가동`} 
           color="purple" 
         />
       </div>
@@ -45,7 +139,7 @@
           <QuickActionCard href="/tables" icon="🪑" label="테이블 관리" desc="좌석 현황 및 주문" />
           <QuickActionCard href="/menu" icon="📋" label="메뉴 관리" desc="메뉴 수정 및 가격" />
           <QuickActionCard href="/kitchen" icon="👨‍🍳" label="주방 화면" desc="주문 진행 상황" />
-          <QuickActionCard href="/waitlist" icon="⏰" label="웨이팅" desc="대기 고객 관리" />
+          <QuickActionCard href="/waitlist" icon="⏰" label="대기" desc="대기 고객 관리" />
           <QuickActionCard href="/cashier" icon="💳" label="계산대" desc="결제 및 정산" />
           <QuickActionCard href="/reports/sales" icon="📊" label="매출 분석" desc="일별 매출 리포트" />
         </div>
@@ -56,18 +150,47 @@
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">최근 주문</h3>
           <div className="space-y-3">
-            <RecentOrderItem table="테이블 3" items="불고기정식, 김치찌개" time="5분 전" status="준비중" />
-            <RecentOrderItem table="테이블 7" items="치킨까스, 콜라" time="8분 전" status="완료" />
-            <RecentOrderItem table="테이블 1" items="비빔밥, 된장찌개" time="12분 전" status="서빙완료" />
+            {recentOrders && recentOrders.length > 0 ? (
+              recentOrders.map((order: any) => {
+                const tableLabel = order.dining_table?.label || `테이블 ${order.table_id}`
+                const items = order.order_item?.slice(0, 2).map((item: any) => item.name_snapshot).join(', ') || '주문 항목 없음'
+                const time = new Date(order.created_at).toLocaleString('ko-KR', { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })
+                const status = order.status === 'paid' ? '결제완료' : 
+                               order.status === 'sent_to_kitchen' ? '준비중' : 
+                               order.status === 'open' ? '주문접수' : order.status
+                
+                return (
+                  <RecentOrderItem 
+                    key={order.id}
+                    table={tableLabel} 
+                    items={items} 
+                    time={time} 
+                    status={status} 
+                  />
+                )
+              })
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                최근 주문이 없습니다.
+              </div>
+            )}
           </div>
         </div>
         
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">알림 및 공지</h3>
           <div className="space-y-3">
-            <NotificationItem type="info" message="새로운 주문이 들어왔습니다. (테이블 5)" time="방금 전" />
-            <NotificationItem type="warning" message="재료 부족: 삼겹살 (5인분 남음)" time="30분 전" />
-            <NotificationItem type="success" message="일일 매출 목표를 달성했습니다!" time="1시간 전" />
+            {notifications.map((notification, index) => (
+              <NotificationItem 
+                key={index}
+                type={notification.type} 
+                message={notification.message} 
+                time={notification.time} 
+              />
+            ))}
           </div>
         </div>
       </div>

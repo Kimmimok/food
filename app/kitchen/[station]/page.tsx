@@ -3,6 +3,7 @@ import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import KitchenBoard from '@/components/kds/KitchenBoard'
 import { bulkMarkDone, bulkMarkServed } from '../actions'
+import { RefreshButton } from '@/components/RefreshButton'
 
 async function sb() {
   const c = await cookies()
@@ -17,30 +18,96 @@ async function sb() {
   )
 }
 
-export default async function StationPage(props: any) {
+export default async function StationPage({ params }: { params: Promise<{ station: string }> }) {
+  const { station } = await params
   const supabase = await sb()
-  const params = props?.params ?? {}
-  const station = params.station ?? String(params?.station ?? 'unknown')
 
-  // 큐 로드 (order_item 및 order_ticket까지 가져오고, 테이블 라벨은 별도 조회)
-  const { data: queue = [] } = await supabase
+  // 음료/주류 스테이션은 주방에서 처리하지 않음
+  if (station === 'beverages') {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">KDS — 음료/주류</h2>
+          <div className="text-xs text-gray-500">음료/주류는 서빙 관리에서 처리됩니다</div>
+        </div>
+        <div className="text-center py-6">
+          <div className="text-3xl mb-2">🥤</div>
+          <p className="text-gray-500">음료/주류 메뉴는 주방에서 처리하지 않습니다.</p>
+          <p className="text-gray-400 text-xs mt-1">서빙 관리 페이지에서 확인하세요.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // KDS 데이터: order_item + menu_item.station 기준으로 로드
+  // Prefer kitchen_queue rows if present (includes order_item join)
+  const { data: kq = [] } = await supabase
     .from('kitchen_queue')
     .select(`
-      id, status, created_at, started_at, done_at,
-      order_item:order_item_id (
-        id, name_snapshot, qty,
-        order_ticket:order_id ( id, table_id )
-      )
+      id, status, created_at, started_at, done_at, station,
+      order_item:order_item_id ( id, name_snapshot, qty, order_ticket:order_id ( id, table_id ) )
     `)
     .eq('station', station)
     .order('created_at', { ascending: true })
 
+  let queue = []
+  if ((kq || []).length > 0) {
+    queue = (kq || [])
+      .filter((r: any) => {
+        const status = (Array.isArray(r.order_item) ? r.order_item[0]?.status : r.order_item?.status) ?? r.status
+        return status !== 'served' // 서빙완료된 항목들만 표시하지 않음
+      })
+      .map((r: any) => ({
+        id: String(r.id),
+        // prefer order_item.status when available
+        status: (Array.isArray(r.order_item) ? r.order_item[0]?.status : r.order_item?.status) ?? r.status,
+        created_at: r.created_at ?? null,
+        started_at: r.started_at ?? null,
+        done_at: r.done_at ?? null,
+        order_item: r.order_item ? ({
+          id: String(r.order_item.id),
+          name_snapshot: r.order_item.name_snapshot,
+          qty: r.order_item.qty,
+          order_ticket: r.order_item.order_ticket ? { id: r.order_item.order_ticket.id, table_id: r.order_item.order_ticket.table_id } : null,
+        }) : null
+      }))
+  } else {
+    // Fallback to order_item -> menu_item.station mapping
+    const { data: items = [] } = await supabase
+      .from('order_item')
+      .select(`
+        id, status, created_at,
+        name_snapshot, qty,
+        order_ticket:order_id ( id, table_id ),
+        menu_item:menu_item_id ( id, station )
+      `)
+      .order('created_at', { ascending: true })
+
+    queue = (items || [])
+      .filter((it: any) => {
+        const itemStation = it.menu_item?.station || 'main'
+        // beverages 스테이션에서는 bar 스테이션의 메뉴도 포함
+        const stationMatch = itemStation === station || (station === 'beverages' && itemStation === 'bar')
+        const statusFilter = it.status !== 'served' // 서빙완료된 항목들만 표시하지 않음
+        return stationMatch && statusFilter
+      })
+      .map((it: any) => ({
+        id: String(it.id),
+        status: it.status,
+        created_at: it.created_at ?? null,
+        started_at: null,
+        done_at: null,
+        order_item: {
+          id: String(it.id),
+          name_snapshot: it.name_snapshot,
+          qty: it.qty,
+          order_ticket: it.order_ticket ? { id: it.order_ticket.id, table_id: it.order_ticket.table_id } : null,
+        }
+      }))
+  }
+
   // 테이블 라벨 맵
-  const tableIds = Array.from(new Set(
-    queue
-      .map((q: any) => q.order_item?.order_ticket?.table_id)
-      .filter(Boolean)
-  ))
+  const tableIds = Array.from(new Set(queue.map((q: any) => q.order_item?.order_ticket?.table_id).filter(Boolean)))
 
   let tableLabelMap: Record<string, string> = {}
   if (tableIds.length > 0) {
@@ -56,12 +123,17 @@ export default async function StationPage(props: any) {
   const ServedAll = async () => { 'use server'; await bulkMarkServed(station) }
 
   return (
-    <div className="space-y-3">
+    <div className={station === 'main' ? 'space-y-4' : 'space-y-3'}>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">KDS — {station}</h2>
-        <div className="flex gap-2">
-          <form action={DoneAll}><button className="px-3 py-2 border rounded text-sm">모두 완료</button></form>
-          <form action={ServedAll}><button className="px-3 py-2 border rounded text-sm">완료 → 서빙완료</button></form>
+        <h2 className={`font-bold ${station === 'main' ? 'text-2xl' : 'text-xl'}`}>KDS — {station}</h2>
+        <div className={`flex ${station === 'main' ? 'gap-3' : 'gap-2'}`}>
+          <RefreshButton
+            className={`${station === 'main' ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-xs'} bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors`}
+          >
+            새로고침
+          </RefreshButton>
+          <form action={DoneAll}><button className={`${station === 'main' ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-xs'} bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors`}>모두 완료</button></form>
+          <form action={ServedAll}><button className={`${station === 'main' ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-xs'} bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors`}>완료 → 서빙완료</button></form>
         </div>
       </div>
 
@@ -69,5 +141,3 @@ export default async function StationPage(props: any) {
     </div>
   )
 }
-
-// actual async Server Component remains above; no extra default exports
