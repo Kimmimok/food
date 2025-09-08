@@ -17,7 +17,8 @@ function supabaseServer() {
   )
 }
 
-export default async function TableDetailPage({ params }: { params: { tableId: string } }) {
+export default async function TableDetailPage(props: any) {
+  const params = props?.params ?? {}
   const supabase = supabaseServer()
 
   // 테이블 정보

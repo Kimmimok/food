@@ -17,9 +17,10 @@ async function sb() {
   )
 }
 
-export default async function StationPage({ params }: { params: { station: string } }) {
+export default async function StationPage(props: any) {
   const supabase = await sb()
-  const station = params.station
+  const params = props?.params ?? {}
+  const station = params.station ?? String(params?.station ?? 'unknown')
 
   // 큐 로드 (order_item 및 order_ticket까지 가져오고, 테이블 라벨은 별도 조회)
   const { data: queue = [] } = await supabase
@@ -68,3 +69,5 @@ export default async function StationPage({ params }: { params: { station: strin
     </div>
   )
 }
+
+// actual async Server Component remains above; no extra default exports
