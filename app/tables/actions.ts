@@ -35,43 +35,50 @@ export async function seatTableAndOpenOrder(tableId: string) {
 }
 
 /** 빈 테이블로 정리 & 오더 닫기(미결계면 open 유지) */
-export async function markTableEmpty(tableId: string) {
-  const supabase = await supabaseServer()
+export async function markTableEmpty(tableId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await supabaseServer()
 
-  // 먼저 해당 테이블의 오픈된 주문을 찾아서 completed로 변경
-  const { data: openOrders, error: orderError } = await supabase
-    .from('order_ticket')
-    .select('id')
-    .eq('table_id', tableId)
-    .in('status', ['open', 'sent_to_kitchen'])
-    .limit(1)
-
-  if (orderError) {
-    console.error('Error finding open orders:', orderError.message)
-  } else if (openOrders && openOrders.length > 0) {
-    // 오픈된 주문이 있으면 completed로 변경
-    const { error: updateError } = await supabase
+    // 먼저 해당 테이블의 오픈된 주문을 찾아서 completed로 변경
+    const { data: openOrders, error: orderError } = await supabase
       .from('order_ticket')
-      .update({ status: 'completed' })
-      .eq('id', openOrders[0].id)
+      .select('id')
+      .eq('table_id', tableId)
+      .in('status', ['open', 'sent_to_kitchen'])
+      .limit(1)
 
-    if (updateError) {
-      console.error('Error updating order status:', updateError.message)
+    if (orderError) {
+      console.error('Error finding open orders:', orderError.message)
+    } else if (openOrders && openOrders.length > 0) {
+      // 오픈된 주문이 있으면 completed로 변경
+      const { error: updateError } = await supabase
+        .from('order_ticket')
+        .update({ status: 'completed' })
+        .eq('id', openOrders[0].id)
+
+      if (updateError) {
+        console.error('Error updating order status:', updateError.message)
+      }
     }
+
+    // 테이블 상태를 empty로 변경
+    const { error } = await supabase
+      .from('dining_table')
+      .update({ status: 'empty' })
+      .eq('id', tableId)
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/tables')
+    revalidatePath(`/tables/${tableId}`)
+    revalidatePath('/kitchen')
+    revalidatePath('/serving')
+    revalidatePath('/cashier')
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('markTableEmpty error:', err.message)
+    return { success: false, error: err.message }
   }
-
-  // 테이블 상태를 empty로 변경
-  const { error } = await supabase
-    .from('dining_table')
-    .update({ status: 'empty' })
-    .eq('id', tableId)
-  if (error) throw new Error(error.message)
-
-  revalidatePath('/tables')
-  revalidatePath(`/tables/${tableId}`)
-  revalidatePath('/kitchen')
-  revalidatePath('/serving')
-  revalidatePath('/cashier')
 }
 
 /** 테이블 정리완료 처리 (dirty -> empty) */
