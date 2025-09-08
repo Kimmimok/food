@@ -190,4 +190,4 @@ function Stat({ label, value }: { label: string; value: string }) {
 		</div>
 	)
 }
-export default function Page(){ return <div>매출 리포트</div>; }
+// NOTE: Removed stray default export that caused duplicate export during build.

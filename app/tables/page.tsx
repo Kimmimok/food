@@ -2,7 +2,8 @@
 import Link from 'next/link'
 import { createServerClient } from '@supabase/ssr'
 import { cookies, headers } from 'next/headers'
-import { seatTableAndOpenOrder, markTableEmpty } from './actions'
+import { seatTableAndOpenOrder } from './actions'
+import MarkEmptyButton from '@/components/MarkEmptyButton'
 
 async function supabaseServer() {
 	const cookieStore = await cookies()
@@ -94,11 +95,11 @@ export default async function TablesPage() {
 								>
 									상세보기
 								</Link>
-								{t.status !== 'seated' ? (
-									<SeatButton tableId={t.id} />
-								) : (
-									<EmptyButton tableId={t.id} />
-								)}
+												{t.status !== 'seated' ? (
+													<SeatButton tableId={t.id} />
+												) : (
+													<MarkEmptyButton tableId={t.id} />
+												)}
 							</div>
 						</div>
 					))}
@@ -165,14 +166,5 @@ function SeatButton({ tableId }: { tableId: string }) {
 	)
 }
 
-function EmptyButton({ tableId }: { tableId: string }) {
-	const Empty = async () => { 'use server'; await markTableEmpty(tableId) }
-	return (
-		<form action={Empty} className="flex-1">
-			<button className="w-full px-3 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors">
-				비우기
-			</button>
-		</form>
-	)
-}
+// ... 기존 서버 사이드 SeatButton는 그대로 유지
 

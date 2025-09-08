@@ -154,13 +154,26 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
         </div>
         
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <form action={async () => { 'use server'; await expireCalledOlderThan(5) }}>
-            <button className="w-full h-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors">
-              호출 만료 처리
-              <br />
-              <span className="text-xs">(5분 기준)</span>
-            </button>
-          </form>
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch('/api/waitlist/expire', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ minutes: 5 }) })
+                const j = await res.json()
+                if (j?.success) {
+                  window.location.reload()
+                } else {
+                  alert('호출 만료 처리 실패: ' + (j?.error ?? '알 수 없음'))
+                }
+              } catch (err) {
+                alert('요청 실패: ' + String(err))
+              }
+            }}
+            className="w-full h-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors"
+          >
+            호출 만료 처리
+            <br />
+            <span className="text-xs">(5분 기준)</span>
+          </button>
         </div>
       </div>
 

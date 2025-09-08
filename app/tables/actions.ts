@@ -49,14 +49,32 @@ export async function seatTableAndOpenOrder(tableId: string) {
 
 /** 빈 테이블로 정리 & 오더 닫기(미결계면 open 유지) */
 export async function markTableEmpty(tableId: string) {
-  const supabase = await supabaseServer()
-  const { error } = await supabase
-    .from('dining_table')
-    .update({ status: 'empty' })
-    .eq('id', tableId)
-  if (error) throw new Error(error.message)
-  revalidatePath('/tables')
-  revalidatePath(`/tables/${tableId}`)
+  try {
+    const supabase = await supabaseServer()
+    const { error } = await supabase
+      .from('dining_table')
+      .update({ status: 'empty' })
+      .eq('id', tableId)
+    if (error) {
+      console.error('markTableEmpty error:', error.message)
+      return { success: false, error: error.message }
+    }
+
+    // 재검증 시도
+    try {
+      revalidatePath('/tables')
+      revalidatePath(`/tables/${tableId}`)
+    } catch (reErr) {
+      // revalidatePath가 환경에 따라 실패할 수 있으므로 로그만 남김
+      console.warn('revalidatePath warning:', String(reErr))
+    }
+
+    console.log(`Table ${tableId} marked empty`)
+    return { success: true }
+  } catch (err: any) {
+    console.error('markTableEmpty unexpected error:', err?.message ?? err)
+    return { success: false, error: err?.message ?? String(err) }
+  }
 }
 
 /** 메뉴를 주문 항목으로 추가 */
