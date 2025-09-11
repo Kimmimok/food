@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { getOrCreateOpenOrder } from '@/app/order/actions'
 
-export async function GET(req: Request, { params }: { params: { tableId: string } }) {
-  const tableId = params.tableId
+export async function GET(req: Request, ctx: any) {
+  const tableId = ctx?.params?.tableId
   const supabase = await supabaseServer()
 
   const { data: table } = await supabase
