@@ -24,12 +24,9 @@ export default async function Page() {
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
 				<div>
-					<h1 className="text-2xl font-bold text-gray-900">메뉴 관리</h1>
-					<p className="text-gray-600 mt-1">메뉴 항목을 추가, 수정, 삭제하고 가격을 관리하세요</p>
-				</div>
-				<div className="flex-1">
-					<div className="text-sm text-gray-500">총 {items.length}개 메뉴</div>
-				</div>
+						<h1 className="text-2xl font-bold text-gray-900">메뉴 관리 (총 {items.length}개 메뉴)</h1>
+						<p className="text-gray-600 mt-1">메뉴 항목을 추가, 수정, 삭제하고 가격을 관리하세요</p>
+					</div>
 
 			</div>
 			

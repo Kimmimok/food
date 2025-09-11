@@ -29,7 +29,32 @@ export default function CategoryTabs({ categories }: { categories: Cat[] }) {
     })
   }, [])
 
-  const tabs = useMemo(() => [{ id: 'all', name: '전체' }, ...categories], [categories])
+  const tabs = useMemo(() => {
+    const preferredOrder = ['식사', '안주', '주류', '음료']
+    const normalize = (s = '') => s.toLowerCase()
+    const mapKey = (name = '') => {
+      const n = normalize(name)
+      if (n.includes('식') || n.includes('meal') || n.includes('main')) return '식사'
+      if (n.includes('안주') || n.includes('side') || n.includes('appetizer')) return '안주'
+      if (n.includes('주류') || n.includes('alcohol') || n.includes('beer') || n.includes('wine')) return '주류'
+      if (n.includes('음료') || n.includes('drink') || n.includes('beverage') || n.includes('juice')) return '음료'
+      return name
+    }
+
+    const cloned = Array.isArray(categories) ? [...categories] : []
+    cloned.sort((a: any, b: any) => {
+      const ka = mapKey(a.name)
+      const kb = mapKey(b.name)
+      const ia = preferredOrder.indexOf(ka as string)
+      const ib = preferredOrder.indexOf(kb as string)
+      if (ia === -1 && ib === -1) return 0
+      if (ia === -1) return 1
+      if (ib === -1) return -1
+      return ia - ib
+    })
+
+    return [{ id: 'all', name: '전체' }, ...cloned]
+  }, [categories])
 
   const go = (id: string) => {
     const sp = new URLSearchParams(params as any)

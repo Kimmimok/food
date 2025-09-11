@@ -10,7 +10,7 @@ export default function ImageModal({ src, onClose }: { src?: string | null, onCl
 
   if (!src) return null
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 text-lg" onClick={onClose}>
       <div className="relative max-w-full max-h-full">
         <img src={src} alt="메뉴 이미지" className="max-w-full max-h-full rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} />
         <button 

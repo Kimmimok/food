@@ -4,12 +4,13 @@ import { requireRole } from '../../lib/auth'
 import { RefreshButton } from '@/components/RefreshButton'
 import StationPage from './[station]/page'
 import ServingCard from '@/components/serving/ServingCard'
-import ServingSummary from '@/components/serving/ServingSummary'
+// ServingSummary removed from this page; realtime handled inside station components
 // Realtime sync removed from this page - kept logic server-side
 
 const STATIONS = [
 	{ id: 'main', name: '메인 키친', icon: '🍳' },
 	{ id: 'beverages', name: '음료/주류', icon: '🥤' },
+	{ id: 'dessert', name: '디저트', icon: '🍰' },
 ]
 
 export default async function ServingHome() {
@@ -223,28 +224,7 @@ export default async function ServingHome() {
 	console.log('Total completed:', totalCompleted)
 	console.log('Items sample:', safeItems.slice(0, 3))
 
-	// 서빙완료(이미 서빙 처리된 항목) 카운트 조회
-	// 전체 서빙 항목(서빙 준비(done) + 서빙 완료(served)) 조회
-	let servedCount = 0
-	let allServingItems: any[] = []
-	try {
-		// served count (total served)
-		const { count, error } = await supabase
-			.from('order_item')
-			.select('*', { head: true, count: 'exact' })
-			.eq('status', 'served')
-		if (!error && typeof count === 'number') servedCount = count
-
-		// get both done and served items for listing
-		const { data: sdata, error: sErr } = await supabase
-			.from('order_item')
-			.select(`id, status, name_snapshot, qty, done_at, order_id, order_ticket:order_id ( id, table_id )`)
-			.in('status', ['done','served'])
-			.order('done_at', { ascending: false })
-		if (!sErr && sdata) allServingItems = sdata
-	} catch (err) {
-		console.warn('Failed to query serving items/count:', err)
-	}
+	// (서빙완료 관련 전체 목록/카운트는 이 페이지에서 제거)
 
 	return (
 		<div className="space-y-6">
@@ -266,7 +246,7 @@ export default async function ServingHome() {
 				</div>
 			</div>
 
-			{/* 전체 서빙 현황 - 3개 카드: 메인 / 주류 및 음료 / 서빙완료 */}
+			{/* 전체 서빙 현황 - 3개 카드: 메인 / 주류 및 음료 / 디저트 */}
 			<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
 				<h3 className="text-lg font-semibold text-gray-900 mb-4">전체 서빙 현황</h3>
 				<div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -278,9 +258,9 @@ export default async function ServingHome() {
 						<div className="text-2xl font-bold text-blue-600">{stationCounts.beverages || 0}</div>
 						<div className="text-sm text-gray-600">주류 및 음료</div>
 					</div>
-					<div className="text-center p-4 bg-green-50 rounded-lg">
-						<div className="text-2xl font-bold text-green-600">{servedCount || 0}</div>
-						<div className="text-sm text-gray-600">서빙완료</div>
+					<div className="text-center p-4 bg-pink-50 rounded-lg">
+						<div className="text-2xl font-bold text-pink-600">{stationCounts.dessert || 0}</div>
+						<div className="text-sm text-gray-600">디저트</div>
 					</div>
 				</div>
 			</div>
@@ -299,63 +279,10 @@ export default async function ServingHome() {
 						</div>
 					</div>
 				))}
-				{/* 서빙완료 카드 */}
-				<div className="w-full bg-white rounded-xl shadow-sm border border-gray-200 p-6 min-h-[480px]">
-					<div className="text-center">
-						<div className="text-sm text-gray-500">전체 서빙완료</div>
-						<div className="text-2xl font-bold mt-2">{servedCount || 0}</div>
-					</div>
-					<div className="mt-4 grid grid-cols-1 gap-4">
-						<div>
-							<h4 className="text-sm font-medium mb-2">서빙 준비</h4>
-							{allServingItems.filter(i=>i.status==='done').length === 0 ? (
-								<p className="text-sm text-gray-500">서빙 준비 중인 항목이 없습니다</p>
-							) : (
-								<ul className="space-y-3">
-									{allServingItems.filter(i=>i.status==='done').map(s => (
-										<li key={s.id} className="border rounded p-3 bg-gray-50">
-											<div className="font-medium">{s.name_snapshot} × {s.qty}</div>
-											<div className="text-xs text-gray-500">{s.order_ticket?.table_id ? `테이블 ${s.order_ticket.table_id}` : ''} {s.done_at ? new Date(s.done_at).toLocaleTimeString() : ''}</div>
-										</li>
-									))}
-								</ul>
-							)}
-						</div>
-						<div>
-							<h4 className="text-sm font-medium mb-2">서빙 완료</h4>
-							{allServingItems.filter(i=>i.status==='served').length === 0 ? (
-								<p className="text-sm text-gray-500">서빙 완료된 항목이 없습니다</p>
-							) : (
-								<ul className="space-y-3">
-									{allServingItems.filter(i=>i.status==='served').map(s => (
-										<li key={s.id} className="border rounded p-3 bg-gray-50">
-											<div className="font-medium">{s.name_snapshot} × {s.qty}</div>
-											<div className="text-xs text-gray-500">{s.order_ticket?.table_id ? `테이블 ${s.order_ticket.table_id}` : ''} {s.done_at ? new Date(s.done_at).toLocaleTimeString() : ''}</div>
-										</li>
-									))}
-								</ul>
-							)}
-						</div>
-					</div>
-				</div>
+				{/* '서빙완료' 카드 제거 - 각 스테이션 카드만 표시 */}
 			</div>
 		
-			{/* 데이터가 없을 때 안내 메시지 */}
-			{totalCompleted === 0 && (
-				<div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-					<div className="text-center">
-						<h3 className="text-lg font-semibold text-blue-800 mb-2">서빙할 항목이 없습니다</h3>
-						<p className="text-blue-600 mb-4">
-							주방에서 완료된 주문 항목들이 여기에 표시됩니다.
-						</p>
-						<div className="text-sm text-blue-500">
-							<p>1. 메뉴에서 주문을 생성하세요</p>
-							<p>2. 주방에서 주문을 "완료" 처리하세요</p>
-							<p>3. 완료된 항목들이 서빙 페이지에 표시됩니다</p>
-						</div>
-					</div>
-				</div>
-			)}
+			{/* 빈 상태 안내 메시지 제거 per request */}
 
 		</div>
 	)
