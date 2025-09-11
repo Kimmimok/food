@@ -29,7 +29,7 @@ export default function QrGenerator({ defaultMax = 1, settings }: { defaultMax?:
 
     const list: Array<{ table: number; url: string; src?: string | null }> = []
     for (let t = 0; t <= n; t++) {
-      const target = t === 0 ? `${cleanBase}/waitlist` : `${cleanBase}/order/${t}`
+  const target = t === 0 ? `${cleanBase}/waitlist/apply` : `${cleanBase}/order/${t}`
       list.push({ table: t, url: target, src: null })
     }
     setItems(list)
