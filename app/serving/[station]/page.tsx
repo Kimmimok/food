@@ -3,6 +3,7 @@ import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import ServingBoard from '@/components/serving/ServingBoard'
 import { bulkMarkServed } from '../../kitchen/actions'
+import BulkServeButton from '@/components/serving/BulkServeButton'
 
 async function sb() {
   const c = await cookies()
@@ -71,8 +72,8 @@ export default async function ServingStationPage({ params }: { params: Promise<{
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">서빙 관리 — {station}</h2>
-        </div>
+              <div className="flex-1" />
+            </div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <div className="text-center">
             <h3 className="text-lg font-semibold text-red-800 mb-2">데이터베이스 오류</h3>
@@ -207,15 +208,14 @@ export default async function ServingStationPage({ params }: { params: Promise<{
     }
   }
 
-  // 일괄 버튼(서버 액션)
-  const ServedAll = async () => { 'use server'; await bulkMarkServed(station) }
+  // (일괄 처리는 클라이언트 BulkServeButton에서 호출)
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">서빙 관리 — {station}</h2>
+        <div className="flex-1" />
         <div className="flex gap-2">
-          <form action={ServedAll}><button className="px-6 py-3 bg-green-600 text-white rounded-lg text-lg font-semibold hover:bg-green-700 transition-colors">모두 서빙완료</button></form>
+          <BulkServeButton station={station} />
         </div>
       </div>
 
@@ -234,7 +234,7 @@ export default async function ServingStationPage({ params }: { params: Promise<{
           </div>
         </div>
       ) : (
-        <ServingBoard station={station} initialQueue={queue as any} tableLabelMap={tableLabelMap} />
+        <ServingBoard station={station} initialQueue={queue as any} tableLabelMap={tableLabelMap} showServedSection={false} />
       )}
     </div>
   )

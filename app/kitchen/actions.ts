@@ -102,4 +102,5 @@ export async function bulkMarkServed(station: string) {
   revalidatePath('/serving')
   revalidatePath('/cashier')
   revalidatePath('/tables')
+  return ids
 }

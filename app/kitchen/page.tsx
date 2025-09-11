@@ -1,4 +1,4 @@
-﻿import Link from 'next/link'
+﻿import StationPage from './[station]/page'
 import { supabaseServer } from '../../lib/supabase-server'
 import { requireRole } from '../../lib/auth'
 import { RealtimeSync } from '../../components/RealtimeSync'
@@ -108,67 +108,40 @@ export default async function KitchenHome() {
 		<div className="space-y-4">
 			<RealtimeSync />
 			<div className="flex items-center justify-between">
-				<div>
-					<h1 className="text-2xl font-bold text-gray-900">주방 디스플레이 시스템</h1>
-					<p className="text-sm text-gray-600 mt-1">스테이션별로 주문 현황을 확인하고 관리하세요</p>
-				</div>
-				<div className="flex items-center space-x-2">
-					<div className="text-xs text-gray-500">
-						주방 스테이션 선택
-					</div>
-					<div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-				</div>
+				
+				{/* header right side cleaned (station selector removed) */}
 			</div>
 			
-			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-				{STATIONS.map(s => (
-					<div key={s.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-						<div className="flex items-center justify-between mb-3">
-							<div className="text-3xl">{s.icon}</div>
-							<div className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-								활성
-							</div>
-						</div>
-						
-						<h3 className="text-lg font-bold text-gray-900 mb-2">{s.name}</h3>
-						<p className="text-xs text-gray-600 mb-4">{s.desc}</p>
-						
-						<div className="flex items-center justify-between">
-							<div className="text-base text-gray-500">
-								대기 주문: <span className="font-bold text-orange-600 text-lg">{stationCounts[s.id] ?? 0}건</span>
-							</div>
-							<Link 
-								className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-xs" 
-								href={`/kitchen/${s.id}`}
-							>
-								스테이션 열기
-							</Link>
-						</div>
-					</div>
-				))}
-			</div>
-			
-			{/* 전체 주문 요약 */}
+			{/* 전체 주문 요약 (최상단으로 이동) */}
 			<div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-				<h3 className="text-base font-semibold text-gray-900 mb-3">전체 주방 현황</h3>
-				<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+				<h3 className="text-lg font-semibold text-gray-900 mb-3">전체 주방 현황</h3>
+				<div className="grid grid-cols-1 md:grid-cols-5 gap-3">
 					<div className="text-center p-3 bg-orange-50 rounded-lg">
-						<div className="text-xl font-bold text-orange-600">{totals.queued}</div>
-						<div className="text-xs text-gray-600 mt-1">대기중</div>
+						<div className="text-base text-gray-700">메인 : <span className="text-2xl font-bold text-orange-600">{stationCounts.main ?? 0}</span></div>
 					</div>
 					<div className="text-center p-3 bg-blue-50 rounded-lg">
-						<div className="text-xl font-bold text-blue-600">{totals.in_progress}</div>
-						<div className="text-xs text-gray-600 mt-1">준비중</div>
+						<div className="text-base text-gray-700">디저트 : <span className="text-2xl font-bold text-blue-600">{stationCounts.dessert ?? 0}</span></div>
+					</div>
+					<div className="text-center p-3 bg-yellow-50 rounded-lg">
+						<div className="text-base text-gray-700">대기중 : <span className="text-2xl font-bold text-yellow-600">{totals.queued}</span></div>
+					</div>
+					<div className="text-center p-3 bg-blue-50 rounded-lg">
+						<div className="text-base text-gray-700">준비중 : <span className="text-2xl font-bold text-blue-600">{totals.in_progress}</span></div>
 					</div>
 					<div className="text-center p-3 bg-green-50 rounded-lg">
-						<div className="text-xl font-bold text-green-600">{totals.done}</div>
-						<div className="text-xs text-gray-600 mt-1">완료</div>
-					</div>
-					<div className="text-center p-3 bg-purple-50 rounded-lg">
-						<div className="text-xl font-bold text-purple-600">-</div>
-						<div className="text-xs text-gray-600 mt-1">평균 처리시간</div>
+						<div className="text-base text-gray-700">완료 : <span className="text-2xl font-bold text-green-600">{totals.done}</span></div>
 					</div>
 				</div>
+			</div>
+			
+			{/* 각 스테이션의 페이지를 통합 표시 (개별 스테이션 페이지 컴포넌트를 임포트하여 렌더) */}
+			<div className="space-y-6">
+				{STATIONS.map(s => (
+					<div key={s.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+						{/* StationPage expects params as a Promise; pass resolved promise */}
+						<StationPage params={Promise.resolve({ station: s.id })} />
+					</div>
+				))}
 			</div>
 		</div>
 	)

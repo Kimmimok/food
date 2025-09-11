@@ -121,8 +121,14 @@ export default function TablesPage() {
     })
 
     try {
-      // call server action, but don't block the UI
-      await markTableClean(tableId)
+      // call server action and check result
+      const result = await markTableClean(tableId)
+      if (!result.success) {
+        console.error('Failed to mark table as clean:', result.error)
+        // on error, reload to reconcile state
+        await loadTablesData()
+        return
+      }
       // ensure canonical data after server completes
       await loadTablesData()
     } catch (error) {
@@ -147,10 +153,19 @@ export default function TablesPage() {
     })
 
     try {
-      await markAllTablesClean()
+      // call server action and check result
+      const result = await markAllTablesClean()
+      if (!result.success) {
+        console.error('Failed to mark all tables as clean:', result.error)
+        // on error, reload to reconcile state
+        await loadTablesData()
+        return
+      }
+      // ensure canonical data after server completes
       await loadTablesData()
     } catch (error) {
       console.error('Error marking all tables as clean:', error)
+      // on error, reload to reconcile state
       await loadTablesData()
     }
   }

@@ -22,11 +22,13 @@ type SQueue = {
 export default function ServingBoard({
   station,
   initialQueue,
-  tableLabelMap
+  tableLabelMap,
+  showServedSection = true
 }: {
   station: string
   initialQueue: SQueue[]
   tableLabelMap: Record<string, string>
+  showServedSection?: boolean
 }) {
   const [rows, setRows] = useState<SQueue[]>(initialQueue)
 
@@ -147,9 +149,11 @@ export default function ServingBoard({
   }, [rows])
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 gap-3">
       <Section title="서빙 준비 완료" items={grouped.done} tableLabelMap={tableLabelMap} />
-      <Section title="서빙 완료" items={grouped.served} tableLabelMap={tableLabelMap} />
+      {showServedSection && (
+        <Section title="서빙 완료" items={grouped.served} tableLabelMap={tableLabelMap} />
+      )}
     </div>
   )
 }

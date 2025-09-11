@@ -125,15 +125,15 @@ export default async function StationPage({ params }: { params: Promise<{ statio
   return (
     <div className={station === 'main' ? 'space-y-4' : 'space-y-3'}>
       <div className="flex items-center justify-between">
-        <h2 className={`font-bold ${station === 'main' ? 'text-2xl' : 'text-xl'}`}>KDS — {station}</h2>
+        <h2 className={`font-bold ${station === 'main' ? 'text-3xl' : 'text-2xl'}`}>KDS — {station}</h2>
         <div className={`flex ${station === 'main' ? 'gap-3' : 'gap-2'}`}>
           <RefreshButton
-            className={`${station === 'main' ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-xs'} bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors`}
+            className={`${station === 'main' ? 'px-4 py-2 text-base' : 'px-3 py-1.5 text-sm'} bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors`}
           >
             새로고침
           </RefreshButton>
-          <form action={DoneAll}><button className={`${station === 'main' ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-xs'} bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors`}>모두 완료</button></form>
-          <form action={ServedAll}><button className={`${station === 'main' ? 'px-4 py-2 text-sm' : 'px-3 py-1.5 text-xs'} bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors`}>완료 → 서빙완료</button></form>
+          <form action={DoneAll}><button className={`${station === 'main' ? 'px-4 py-2 text-base' : 'px-3 py-1.5 text-sm'} bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors`}>모두 완료</button></form>
+          <form action={ServedAll}><button className={`${station === 'main' ? 'px-4 py-2 text-base' : 'px-3 py-1.5 text-sm'} bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors`}>완료 → 서빙완료</button></form>
         </div>
       </div>
 
