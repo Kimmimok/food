@@ -9,7 +9,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "mkcert:create": "mkcert -install && mkcert -cert-file cert.pem -key-file key.pem localhost 127.0.0.1 ::1",
+    "dev:https": "npx local-ssl-proxy --source 3443 --target 3000 --cert ./cert.pem --key ./key.pem"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +35,7 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "local-ssl-proxy": "^4.0.0"
   }
 }

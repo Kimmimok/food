@@ -24,6 +24,24 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [userRole, setUserRole] = useState<'guest'|'member'|'manager'|'admin'>('guest')
   const tableMap = useMemo(() => Object.fromEntries(tables.map(t => [t.id, t.label])), [tables])
+  const [pending, setPending] = useState<Record<string, boolean>>({})
+
+  const setPendingFlag = (id: string, v: boolean) => setPending((p) => ({ ...p, [id]: v }))
+
+  // 즉시 반영용 재조회 함수 (실패/롤백 시 사용)
+  const refetchWaitlist = async () => {
+    try {
+      const client = supabase()
+      const { data } = await client
+        .from('waitlist')
+        .select('*')
+        .in('status', ['waiting','called'])
+        .order('created_at', { ascending: true })
+      if (Array.isArray(data)) setRows(data as any)
+    } catch (e) {
+      console.error('refetchWaitlist error:', e)
+    }
+  }
 
   // Realtime: waitlist 변경
   useEffect(() => {
@@ -68,10 +86,7 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
   const waiting = rows.filter(r => r.status === 'waiting')
   const called = rows.filter(r => r.status === 'called')
 
-  const avgWaitMin = useMemo(() => {
-    // 매우 단순한 평균: (called/seat 시간 기반이 없으니) waiting 수 × 3분
-    return waiting.length * 3
-  }, [waiting.length])
+  const availableTablesList = useMemo(() => tables.filter(t => t.status !== 'seated' && t.status !== 'dirty'), [tables])
 
   return (
     <div className="space-y-6">
@@ -86,7 +101,15 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
             if (!draft.name || !size) return alert('이름/인원수를 확인하세요.')
             try {
               setIsSubmitting(true)
-              await addWait({ name: draft.name, phone: draft.phone || undefined, size, note: draft.note || undefined })
+              const created = await addWait({ name: draft.name, phone: draft.phone || undefined, size, note: draft.note || undefined })
+              // optimistic: 방금 추가된 항목이 실시간 이벤트 도착 전에도 보이도록 즉시 추가
+              if (created && (created.status === 'waiting' || created.status === 'called')) {
+                setRows(prev => {
+                  // 중복 방지(실시간과 겹칠 수 있음)
+                  if (prev.some(r => r.id === created.id)) return prev
+                  return [...prev, created as any].sort((a,b)=> a.created_at.localeCompare(b.created_at))
+                })
+              }
               setDraft({ name: '', phone: '', size: '2', note: '' })
             } finally {
               setIsSubmitting(false)
@@ -170,10 +193,10 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-      <p className="text-sm font-medium text-green-600">예상 대기</p>
-      <p className="text-2xl font-bold text-green-900 mt-1">{avgWaitMin}분</p>
+      <p className="text-sm font-medium text-green-600">테이블</p>
+      <p className="text-2xl font-bold text-green-900 mt-2">{availableTablesList.length === 0 ? '—' : availableTablesList.slice(0,4).map(t=>t.label).join(' · ')}{availableTablesList.length > 4 ? ' 등' : ''}</p>
             </div>
-            <div className="text-2xl">📊</div>
+            <div className="text-2xl">🪑</div>
           </div>
         </div>
         
@@ -224,22 +247,64 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                 
                 <div className="flex gap-2">
                   <button 
-                    onClick={() => callWait(w.id)} 
+                    onClick={async () => {
+                      if (pending[w.id]) return
+                      setPendingFlag(w.id, true)
+                      // optimistic: waiting -> called
+                      setRows(prev => prev.map(r => r.id === w.id ? { ...r, status: 'called', called_at: new Date().toISOString() } as any : r))
+                      try {
+                        await callWait(w.id)
+                      } catch (err) {
+                        console.error('callWait failed, refetching...', err)
+                        await refetchWaitlist()
+                      } finally {
+                        setPendingFlag(w.id, false)
+                      }
+                    }} 
                     className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                    disabled={!!pending[w.id]}
                   >
                     📢 호출
                   </button>
                   {(userRole === 'manager' || userRole === 'admin') && (
                     <>
                       <button 
-                        onClick={() => cancelWait(w.id)} 
+                        onClick={async () => {
+                          if (pending[w.id]) return
+                          setPendingFlag(w.id, true)
+                          // optimistic: 목록에서 제거 (waiting/called만 보이므로)
+                          setRows(prev => prev.filter(r => r.id !== w.id))
+                          try {
+                            await cancelWait(w.id)
+                          } catch (err) {
+                            console.error('cancelWait failed, refetching...', err)
+                            await refetchWaitlist()
+                          } finally {
+                            setPendingFlag(w.id, false)
+                          }
+                        }} 
                         className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                        disabled={!!pending[w.id]}
                       >
                         취소
                       </button>
                       <button 
-                        onClick={() => noShowWait(w.id)} 
+                        onClick={async () => {
+                          if (pending[w.id]) return
+                          setPendingFlag(w.id, true)
+                          // optimistic: 목록에서 제거
+                          setRows(prev => prev.filter(r => r.id !== w.id))
+                          try {
+                            await noShowWait(w.id)
+                          } catch (err) {
+                            console.error('noShowWait failed, refetching...', err)
+                            await refetchWaitlist()
+                          } finally {
+                            setPendingFlag(w.id, false)
+                          }
+                        }} 
                         className="px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
+                        disabled={!!pending[w.id]}
                       >
                         노쇼
                       </button>
@@ -285,21 +350,54 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                 </div>
 
                 <div className="mb-3">
-                  <SeatPicker waitId={w.id} tables={tables} />
+                  <SeatPicker 
+                    waitId={w.id} 
+                    tables={tables} 
+                    onAssigned={(id: string) => {
+                      // 좌석 배정 성공 시 목록에서 제거 (server action 성공 후 SeatPicker에서 호출)
+                      setRows(prev => prev.filter(r => r.id !== id))
+                    }}
+                  />
                 </div>
                 
                 <div className="flex gap-2">
                   {(userRole === 'manager' || userRole === 'admin') && (
                     <>
                       <button 
-                        onClick={() => cancelWait(w.id)} 
+                        onClick={async () => {
+                          if (pending[w.id]) return
+                          setPendingFlag(w.id, true)
+                          setRows(prev => prev.filter(r => r.id !== w.id))
+                          try {
+                            await cancelWait(w.id)
+                          } catch (err) {
+                            console.error('cancelWait failed, refetching...', err)
+                            await refetchWaitlist()
+                          } finally {
+                            setPendingFlag(w.id, false)
+                          }
+                        }} 
                         className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                        disabled={!!pending[w.id]}
                       >
                         취소
                       </button>
                       <button 
-                        onClick={() => noShowWait(w.id)} 
+                        onClick={async () => {
+                          if (pending[w.id]) return
+                          setPendingFlag(w.id, true)
+                          setRows(prev => prev.filter(r => r.id !== w.id))
+                          try {
+                            await noShowWait(w.id)
+                          } catch (err) {
+                            console.error('noShowWait failed, refetching...', err)
+                            await refetchWaitlist()
+                          } finally {
+                            setPendingFlag(w.id, false)
+                          }
+                        }} 
                         className="flex-1 px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
+                        disabled={!!pending[w.id]}
                       >
                         노쇼 처리
                       </button>
@@ -321,18 +419,52 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
   )
 }
 
-function SeatPicker({ waitId, tables }: { waitId: string; tables: Table[] }) {
+function SeatPicker({ waitId, tables, onAssigned }: { waitId: string; tables: Table[]; onAssigned?: (waitId: string) => void }) {
   const [tableId, setTableId] = useState('')
+  const [localTables, setLocalTables] = useState<Table[]>(tables)
+
+  // keep localTables in sync if parent prop changes
+  useEffect(() => setLocalTables(tables), [tables])
+
+  // subscribe to dining_table realtime updates so availableTables reflect changes
+  useEffect(() => {
+    const client = supabase()
+    const ch = client
+      .channel('dining_table_public')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dining_table' }, (payload) => {
+        const ev = payload.eventType
+        if (ev === 'INSERT') {
+          setLocalTables(prev => [...prev, payload.new])
+        } else if (ev === 'UPDATE') {
+          setLocalTables(prev => prev.map(t => t.id === payload.new.id ? payload.new : t))
+        } else if (ev === 'DELETE') {
+          setLocalTables(prev => prev.filter(t => t.id !== payload.old.id))
+        }
+      })
+      .subscribe()
+
+    return () => { client.removeChannel(ch) }
+  }, [])
 
   const availableTables = useMemo(
-    () => tables.filter(t => t.status === 'empty' || t.status === 'reserved'),
-    [tables]
+    // treat any table that is not currently seated or dirty as available
+    () => localTables.filter(t => t.status !== 'seated' && t.status !== 'dirty'),
+    [localTables]
   )
 
   const assign = async () => {
     if (!tableId) return alert('테이블을 선택하세요.')
-    await seatWait({ waitId, tableId })
-    setTableId('')
+    try {
+      await seatWait({ waitId, tableId })
+  // 부모에 즉시 반영 요청
+  onAssigned?.(waitId)
+      // refetch local tables to reflect exact server state after assignment
+      const client = supabase()
+      const { data } = await client.from('dining_table').select('id,label,capacity,status').order('label', { ascending: true })
+      if (data) setLocalTables(data as Table[])
+    } finally {
+      setTableId('')
+    }
   }
 
   return (
@@ -345,9 +477,9 @@ function SeatPicker({ waitId, tables }: { waitId: string; tables: Table[] }) {
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">테이블 선택</option>
-          {availableTables.map(t => (
+      {availableTables.map(t => (
             <option key={t.id} value={t.id}>
-              {t.label} ({t.capacity}명) - {t.status === 'empty' ? '사용가능' : '예약됨'}
+        {t.label} ({t.capacity}명) - {t.status === 'reserved' ? '예약됨' : '사용가능'}
             </option>
           ))}
         </select>

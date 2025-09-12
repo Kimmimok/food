@@ -24,10 +24,22 @@ type Order = {
 
 export default function CashierPanel({ orders }: { orders: Order[] }) {
   const safeOrders = orders || []
+  // 총합이 0인 주문은 표시하지 않음
+  // DB의 o.total이 없으면 order_item에서 합계를 계산하여 판단
+  const visibleOrders = safeOrders.filter(o => {
+    const itemsList = o.order_item || o.items || []
+    const calculated = itemsList.reduce((sum: number, item: any) => {
+      const unitPrice = Number(item.price ?? item.price_snapshot ?? item.unit_price ?? item.menu_item?.price ?? 0) || 0
+      const qty = Number(item.qty ?? item.quantity ?? 0) || 0
+      return sum + unitPrice * qty
+    }, 0)
+    const total = Number(o.total ?? calculated) || 0
+    return total > 0
+  })
   const [method, setMethod] = useState<'cash' | 'card'>('card')
   const [amount, setAmount] = useState('')
   // 기본적으로 모든 주문의 세부 내역을 펼쳐서 표시합니다
-  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(() => new Set((orders || []).map((o: any) => o.id)))
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(() => new Set((visibleOrders || []).map((o: any) => o.id)))
 
   const toggleExpanded = (orderId: string) => {
     const newExpanded = new Set(expandedOrders)
@@ -51,11 +63,18 @@ export default function CashierPanel({ orders }: { orders: Order[] }) {
 
   return (
     <div>
-      {safeOrders.length > 0 ? (
+      {visibleOrders.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {safeOrders.map(o => {
+          {visibleOrders.map(o => {
         const isExpanded = expandedOrders.has(o.id)
-        const totalAmount = o.total ?? 0
+        // 계산된 합계: DB의 o.total이 없으면 order_item 또는 items에서 합계 계산
+        const itemsList = o.order_item || o.items || []
+        const calculatedTotal = itemsList.reduce((sum: number, item: any) => {
+          const unitPrice = Number(item.price ?? item.price_snapshot ?? item.unit_price ?? item.menu_item?.price ?? 0) || 0
+          const qty = Number(item.qty ?? item.quantity ?? 0) || 0
+          return sum + unitPrice * qty
+        }, 0)
+        const totalAmount = Number(o.total ?? calculatedTotal)
         
         return (
             <div key={o.id} className="border rounded-xl p-4 bg-white">
@@ -86,20 +105,21 @@ export default function CashierPanel({ orders }: { orders: Order[] }) {
             </div>
 
             {/* 세부 내역 */}
-            {isExpanded && o.order_item && o.order_item.length > 0 && (
+            {isExpanded && (o.order_item || o.items) && (o.order_item || o.items).length > 0 && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                 <div className="space-y-2">
-                    {o.order_item.map(item => {
-                      const unitPrice = item.price ?? item.price_snapshot ?? item.menu_item?.price ?? 0
+                    {(o.order_item || o.items).map(item => {
+                      const unitPrice = Number(item.price ?? item.price_snapshot ?? item.unit_price ?? item.menu_item?.price ?? 0) || 0
+                      const qty = Number(item.qty ?? item.quantity ?? 0) || 0
                       return (
-                        <div key={item.id} className="flex justify-between items-center text-sm">
+                        <div key={item.id ?? item.name_snapshot} className="flex justify-between items-center text-sm">
                           <div className="flex-1">
-                            <span className="font-medium">{item.name_snapshot}</span>
-                            <span className="text-gray-500 ml-2">× {item.qty}</span>
+                            <span className="font-medium">{item.name_snapshot ?? item.name}</span>
+                            <span className="text-gray-500 ml-2">× {qty}</span>
                           </div>
                           <div className="text-right">
-                            <span className="font-medium">₩ {(unitPrice * item.qty).toLocaleString()}</span>
-                            <span className="text-gray-500 ml-2">(₩ {unitPrice.toLocaleString()} × {item.qty})</span>
+                            <span className="font-medium">₩ {(unitPrice * qty).toLocaleString()}</span>
+                            <span className="text-gray-500 ml-2">(₩ {unitPrice.toLocaleString()} × {qty})</span>
                           </div>
                         </div>
                       )
@@ -149,7 +169,7 @@ export default function CashierPanel({ orders }: { orders: Order[] }) {
           )
         })}
         </div>
-      ) : (
+  ) : (
         <div className="text-center py-8">
           <div className="text-gray-400 text-4xl mb-4">💳</div>
           <p className="text-gray-500">결제 대기중인 주문이 없습니다.</p>

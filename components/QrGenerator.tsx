@@ -29,7 +29,7 @@ export default function QrGenerator({ defaultMax = 1, settings }: { defaultMax?:
 
     const list: Array<{ table: number; url: string; src?: string | null }> = []
     for (let t = 0; t <= n; t++) {
-  const target = t === 0 ? `${cleanBase}/waitlist/apply` : `${cleanBase}/order/${t}`
+      const target = t === 0 ? `${cleanBase}/guest/waitlist` : `${cleanBase}/order/${t}`
       list.push({ table: t, url: target, src: null })
     }
     setItems(list)
@@ -71,10 +71,10 @@ export default function QrGenerator({ defaultMax = 1, settings }: { defaultMax?:
         const res = await fetch('/api/table/token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tableId: String(t) }) })
         const json = await res.json()
         const token = json?.token
-        const target = token ? `${cleanBase}/order/${token}` : `${cleanBase}/order/${t}`
+        const target = token ? `${cleanBase}/guest/order/${token}` : `${cleanBase}/guest/order/${t}`
         list.push({ table: t, url: target, src: null })
       } catch {
-        list.push({ table: t, url: `${cleanBase}/order/${t}`, src: null })
+        list.push({ table: t, url: `${cleanBase}/guest/order/${t}`, src: null })
       }
     }
     setItems(list)

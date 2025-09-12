@@ -44,8 +44,6 @@ export default function MenuList({
   const [items, setItems] = useState<Item[]>(initialItems)
   const [optimisticItems, setOptimisticItems] = useOptimistic(items)
 
-  // 검색어
-  const [q, setQ] = useState('')
 
   // Realtime: menu_item 변경 구독
   useEffect(() => {
@@ -72,10 +70,7 @@ export default function MenuList({
   const filtered = useMemo(() => {
     let rows = (optimisticItems ?? items)
     if (currentCat !== 'all') rows = rows.filter(r => r.category_id === currentCat)
-    if (q.trim()) {
-      const qq = q.toLowerCase()
-      rows = rows.filter(r => r.name.toLowerCase().includes(qq))
-    }
+  // 검색 기능 제거: no-op
     return rows.sort((a,b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
   }, [optimisticItems, items, currentCat, q])
 
@@ -136,12 +131,7 @@ export default function MenuList({
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between">
         <div className="flex gap-2 items-center">
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="메뉴 검색"
-            className="border rounded px-3 py-2 text-sm"
-          />
+          {/* 검색창 제거 */}
           <button onClick={persistOrder} className="px-3 py-2 border rounded text-sm hover:bg-muted">
             정렬 저장
           </button>

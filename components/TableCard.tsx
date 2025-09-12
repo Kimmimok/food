@@ -51,14 +51,14 @@ export default function TableCard({ table, order, onCleanComplete }: { table: an
     <div className={`rounded-lg border-2 p-4 flex flex-col bg-white ${getOrderStatusStyle(order?.status)}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="font-bold text-lg">{table.label}</div>
-        <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusBadgeStyle(order ? table.status : 'empty')}`}>
-          {getStatusLabel(order ? table.status : 'empty')}
+        <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusBadgeStyle(table.status || 'empty')}`}>
+          {getStatusLabel(table.status || 'empty')}
         </span>
       </div>
 
       <div className="text-sm text-gray-600 mb-3">최대 {table.capacity ?? 4}명</div>
 
-      {order && table.status !== 'dirty' ? (
+  {order && table.status === 'seated' ? (
         <div className="text-sm text-gray-700 space-y-2">
           <div>주문시간: {new Date(order.created_at).toLocaleString()}</div>
           {order.status === 'completed' || order.status === 'paid' ? (
@@ -75,7 +75,7 @@ export default function TableCard({ table, order, onCleanComplete }: { table: an
             </ul>
           </div>
         </div>
-      ) : table.status === 'dirty' ? (
+  ) : table.status === 'dirty' ? (
         <div className="text-sm text-yellow-700 space-y-2">
           <div className="text-yellow-600 font-medium">🧹 정리 필요</div>
           <div>결제가 완료되어 테이블 정리가 필요합니다.</div>

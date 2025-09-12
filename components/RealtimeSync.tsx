@@ -157,10 +157,10 @@ export function RealtimeSync({ onUpdate }: RealtimeSyncProps) {
 export function useAutoRefresh() {
   useEffect(() => {
     const handleDataUpdate = () => {
-      // 3초 지연 후 새로고침 (데이터베이스 변경 전파 대기)
+      // 10초 지연 후 새로고침 (데이터베이스 변경 전파 대기)
       setTimeout(() => {
         window.location.reload()
-      }, 3000)
+      }, 10000)
     }
 
     window.addEventListener('pos:data-updated', handleDataUpdate)

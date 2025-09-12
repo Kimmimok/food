@@ -22,11 +22,14 @@ export async function addWait({
   name, phone, size, note
 }: { name: string; phone?: string; size: number; note?: string }) {
   const supabase = await sb()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('waitlist')
     .insert({ name, phone: phone ?? null, size, note: note ?? null, status: 'waiting' })
+    .select('*')
+    .single()
   if (error) throw new Error(error.message)
   revalidatePath('/waitlist')
+  return data
 }
 
 export async function callWait(id: string) {

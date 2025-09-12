@@ -2,40 +2,21 @@
 import React from 'react'
 import MenuGrid from '@/components/MenuGridClient'
 
-function CategoryTabs({ categories, activeCategory, onCategoryChange }: any) {
-  return (
-    <div className="bg-white rounded-xl p-4 shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-900 mb-3">카테고리</h3>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        <button
-          onClick={() => onCategoryChange('all')}
-          className={`px-4 py-2 rounded-full border text-sm font-medium whitespace-nowrap transition-colors duration-200 active:scale-95 ${
-            activeCategory === 'all'
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
-          }`}
-        >
-          전체
-        </button>
-        {categories.map((c: any) => (
-          <button
-            key={c.id}
-            onClick={() => onCategoryChange(c.id)}
-            className={`px-4 py-2 rounded-full border text-sm font-medium whitespace-nowrap transition-colors duration-200 active:scale-95 ${
-              activeCategory === c.id
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
-            }`}
-          >
-            {c.name}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
+function getCategoryIdByName(categories: any[], names: string[]) {
+  if (!categories || categories.length === 0) return 'all'
+  const found = categories.find((c: any) => {
+    const cname = String(c.name || '').trim()
+    return names.some((n) => cname.includes(String(n)))
+  })
+  return found ? String(found.id) : 'all'
 }
 
-function OrderHistoryModal({ cart, setCart, isOpen, onClose, tableId }: { cart: any[], setCart: React.Dispatch<React.SetStateAction<any[]>>, isOpen: boolean, onClose: () => void, tableId: string }) {
+function isActive(categories: any[], names: string[], activeCategory: string) {
+  const id = getCategoryIdByName(categories, names)
+  return id !== 'all' && String(activeCategory) === String(id)
+}
+
+function OrderHistoryModal({ cart, setCart, isOpen, onClose, tableId, onCompleted }: { cart: any[], setCart: React.Dispatch<React.SetStateAction<any[]>>, isOpen: boolean, onClose: () => void, tableId: string, onCompleted?: () => void }) {
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [isCompleted, setIsCompleted] = React.useState(false)
 
@@ -72,6 +53,11 @@ function OrderHistoryModal({ cart, setCart, isOpen, onClose, tableId }: { cart: 
         window.dispatchEvent(new CustomEvent('cart:update', { detail: [] }))
         // 성공 메시지
         alert('주문이 접수되었습니다!')
+        try {
+          // 세션 잠금: 이 탭에서는 QR 재스캔 전까지 재주문 불가
+          sessionStorage.setItem(`order-locked:${tableId}`, '1')
+        } catch {}
+        if (onCompleted) onCompleted()
         onClose()
       } else {
         const errorText = await response.text()
@@ -173,12 +159,21 @@ function OrderHistoryModal({ cart, setCart, isOpen, onClose, tableId }: { cart: 
   )
 }
 
-export default function ClientOrderPanel({ tableId, categories, items }: any) {
+export default function ClientOrderPanel({ tableId, items, categories = [] }: any) {
   const [activeCategory, setActiveCategory] = React.useState<string>('all')
   const [cart, setCart] = React.useState<any[]>([])
   const [showOrderHistory, setShowOrderHistory] = React.useState<boolean>(false)
+  const [locked, setLocked] = React.useState<boolean>(false)
+
+
 
   React.useEffect(() => {
+    // 세션 잠금 상태 확인
+    try {
+      const v = sessionStorage.getItem(`order-locked:${tableId}`)
+      setLocked(v === '1')
+    } catch {}
+
     function handleToggleOrderHistory() {
       setShowOrderHistory(prev => !prev)
     }
@@ -188,18 +183,32 @@ export default function ClientOrderPanel({ tableId, categories, items }: any) {
   }, [])
 
   return (
-    <>
+  <>
       <div className="space-y-6 py-6">
-        <CategoryTabs categories={categories} activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
-  <MenuGrid items={items} activeCategory={activeCategory} cart={cart} setCart={setCart} categories={categories} />
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">메뉴 선택</h3>
+          <div className="flex gap-2">
+            <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['식사','음식']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['식사','음식'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>식사</button>
+            <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['안주']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['안주'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>안주</button>
+            <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['주류']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['주류'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>주류</button>
+            <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['음료']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['음료'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>음료</button>
+            <button type="button" disabled={locked} onClick={() => setActiveCategory('all')} className={`px-3 py-2 rounded-full border ${activeCategory==='all' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>전체</button>
+          </div>
+        </div>
+  <MenuGrid items={items} activeCategory={activeCategory} cart={cart} setCart={setCart} categories={categories} locked={locked} />
+      {locked && (
+        <div className="p-4 bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-xl">
+          주문이 완료되었습니다. 다시 QR을 스캔하면 새 주문이 가능합니다.
+        </div>
+      )}
       </div>
-
       <OrderHistoryModal
         cart={cart}
         setCart={setCart}
         isOpen={showOrderHistory}
         onClose={() => setShowOrderHistory(false)}
         tableId={tableId}
+        onCompleted={() => setLocked(true)}
       />
     </>
   )
