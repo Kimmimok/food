@@ -2,6 +2,12 @@ import { supabaseServer } from '../../lib/supabase-server'
 import SettingsForm from '../../components/SettingsForm'
 import QrGenerator from '../../components/QrGenerator'
 import { requireRole } from '../../lib/auth'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Welcome Food - 시스템 설정',
+  description: '레스토랑 설정을 관리하세요',
+}
 
 export default async function SettingsPage() {
   // 관리자만 접근 가능

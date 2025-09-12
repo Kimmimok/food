@@ -1,4 +1,4 @@
-﻿import '../styles/globals.css'
+import '../styles/globals.css'
 import { getUserAndRole } from '../lib/auth'
 import LogoutButton from '../components/LogoutButton'
 import { supabaseServer } from '../lib/supabase-server'
@@ -6,6 +6,12 @@ import Toasts from '../components/Toast'
 import SoundAlerts from '../components/SoundAlerts'
 import OrderPopup from '../components/OrderPopup'
 import { RealtimeSync } from '../components/RealtimeSync'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Welcome Food',
+  description: '맛있는 음식을 즐기세요',
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { user, role } = await getUserAndRole()

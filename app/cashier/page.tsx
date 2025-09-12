@@ -8,6 +8,12 @@ import { formatCurrency } from '@/lib/utils'
 import { PaymentForm } from '@/components/PaymentForm'
 import { RefreshButton } from '@/components/RefreshButton'
 import { RealtimeSync } from '@/components/RealtimeSync'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Welcome Food - 계산 관리',
+  description: '주문 결제를 처리하세요',
+}
 
 async function sb() {
 	const c = await cookies()

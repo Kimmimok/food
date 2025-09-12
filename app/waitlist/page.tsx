@@ -2,6 +2,12 @@
 import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import WaitlistPanel from '@/components/WaitlistPanel'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Welcome Food - 대기 관리',
+  description: '대기 목록을 관리하세요',
+}
 
 async function sb() {
   const c = await cookies()

@@ -3,6 +3,12 @@ import { cookies, headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import CustomerWaitlistForm from '@/components/CustomerWaitlistForm'
 import RefreshButton from '@/components/RefreshButton'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Welcome Food - 대기 신청',
+  description: '대기 신청을 하시고 편안하게 기다리세요',
+}
 
 async function sb() {
   const c = await cookies()

@@ -45,19 +45,25 @@ export async function callWait(id: string) {
 /** 좌석 배정: 대기 → 테이블 상태 seated, 대기 seated 처리 */
 export async function seatWait({
   waitId, tableId
-}: { waitId: string; tableId: string }) {
+}: { waitId: string; tableId?: string }) {
   const supabase = await sb()
-  // 1) 테이블 상태 업데이트
-  const { error: e1 } = await supabase
-    .from('dining_table')
-    .update({ status: 'seated' })
-    .eq('id', tableId)
-  if (e1) throw new Error(e1.message)
 
-  // 2) 대기 seated 처리
+  // 테이블이 선택된 경우에만 테이블 상태 업데이트
+  if (tableId) {
+    const { error: e1 } = await supabase
+      .from('dining_table')
+      .update({ status: 'seated' })
+      .eq('id', tableId)
+    if (e1) throw new Error(e1.message)
+  }
+
+  // 2) 대기 seated 처리 (테이블 선택 여부와 관계없이)
   const { error: e2 } = await supabase
     .from('waitlist')
-    .update({ status: 'seated', seated_table_id: tableId })
+    .update({
+      status: 'seated',
+      seated_table_id: tableId || null
+    })
     .eq('id', waitId)
   if (e2) throw new Error(e2.message)
 
@@ -113,4 +119,69 @@ export async function expireCalledOlderThan(minutes = 5) {
 // Small server-action wrapper for client components (pre-bound 5 minutes)
 export async function expireCalled5() {
   return await expireCalledOlderThan(5)
+}
+
+// 예약 등록
+export async function addReservation({
+  name, phone, size, reservationTime, duration = 120, specialRequest, depositAmount = 0
+}: {
+  name: string;
+  phone?: string;
+  size: number;
+  reservationTime: string;
+  duration?: number;
+  specialRequest?: string;
+  depositAmount?: number;
+}) {
+  const supabase = await sb()
+  const { data, error } = await supabase
+    .from('waitlist')
+    .insert({
+      name,
+      phone: phone ?? null,
+      size,
+      status: 'waiting',
+      is_reservation: true,
+      reservation_time: reservationTime,
+      reservation_duration: duration,
+      special_request: specialRequest ?? null,
+      deposit_amount: depositAmount,
+      note: `예약: ${new Date(reservationTime).toLocaleString('ko-KR')} (${duration}분) ${specialRequest ? '- ' + specialRequest : ''}`
+    })
+    .select('*')
+    .single()
+  if (error) throw new Error(error.message)
+  revalidatePath('/waitlist')
+  return data
+}
+
+// 예약 확인/도착 처리
+export async function confirmReservation(id: string) {
+  const supabase = await sb()
+  const { error } = await supabase
+    .from('waitlist')
+    .update({
+      status: 'waiting',
+      is_reservation: false,
+      reservation_time: null,
+      called_at: new Date().toISOString()
+    })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/waitlist')
+}
+
+// 예약 취소
+export async function cancelReservation(id: string) {
+  const supabase = await sb()
+  const { error } = await supabase
+    .from('waitlist')
+    .update({
+      status: 'canceled',
+      is_reservation: false,
+      reservation_time: null
+    })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/waitlist')
 }

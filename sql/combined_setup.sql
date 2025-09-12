@@ -56,6 +56,22 @@ INSERT INTO public.restaurant_settings (id) VALUES (1)
 ON CONFLICT (id) DO NOTHING;
 
 /* ------------------------------------------------------------------ */
+-- 3) 대기 테이블에 예약 관련 컬럼 추가
+/* ------------------------------------------------------------------ */
+
+-- 대기 테이블에 예약 관련 컬럼 추가
+ALTER TABLE waitlist
+ADD COLUMN IF NOT EXISTS reservation_time TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS reservation_duration INTEGER DEFAULT 120, -- 분 단위
+ADD COLUMN IF NOT EXISTS special_request TEXT,
+ADD COLUMN IF NOT EXISTS deposit_amount DECIMAL(10,2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS is_reservation BOOLEAN DEFAULT FALSE;
+
+-- 예약 인덱스 추가
+CREATE INDEX IF NOT EXISTS idx_waitlist_reservation_time ON waitlist(reservation_time) WHERE is_reservation = TRUE;
+CREATE INDEX IF NOT EXISTS idx_waitlist_status_reservation ON waitlist(status, is_reservation);
+
+/* ------------------------------------------------------------------ */
 -- 권장: 아래 항목을 수동으로 확인하세요
 -- 1) Supabase 프로젝트에 storage 버킷 `menu-images`가 존재하는지
 -- 2) manager/admin 계정의 user_profile 행(id=auth.user id, role='manager'|'admin')이 있는지

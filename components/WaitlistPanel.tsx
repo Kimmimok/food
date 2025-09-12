@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase-client'
-import { addWait, callWait, seatWait, cancelWait, noShowWait, expireCalled5 } from '@/app/waitlist/actions'
+import { addWait, callWait, seatWait, cancelWait, noShowWait, expireCalled5, addReservation, confirmReservation, cancelReservation } from '@/app/waitlist/actions'
 
 type Wait = {
   id: string
@@ -25,6 +25,17 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
   const [userRole, setUserRole] = useState<'guest'|'member'|'manager'|'admin'>('guest')
   const tableMap = useMemo(() => Object.fromEntries(tables.map(t => [t.id, t.label])), [tables])
   const [pending, setPending] = useState<Record<string, boolean>>({})
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showReservationModal, setShowReservationModal] = useState(false)
+  const [reservationDraft, setReservationDraft] = useState({
+    name: '',
+    phone: '',
+    size: '2',
+    reservationTime: '',
+    duration: '120',
+    specialRequest: '',
+    depositAmount: '0'
+  })
 
   const setPendingFlag = (id: string, v: boolean) => setPending((p) => ({ ...p, [id]: v }))
 
@@ -85,92 +96,308 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
 
   const waiting = rows.filter(r => r.status === 'waiting')
   const called = rows.filter(r => r.status === 'called')
+  const reservations = rows.filter(r => (r as any).is_reservation === true)
 
   const availableTablesList = useMemo(() => tables.filter(t => t.status !== 'seated' && t.status !== 'dirty'), [tables])
 
+  // 예약 처리 함수
+  const handleReservationAction = async (reservationId: string, action: 'confirm' | 'cancel') => {
+    if (pending[reservationId]) return
+    setPendingFlag(reservationId, true)
+    
+    try {
+      if (action === 'confirm') {
+        await confirmReservation(reservationId)
+      } else if (action === 'cancel') {
+        // optimistic: 목록에서 제거
+        setRows(prev => prev.filter(r => r.id !== reservationId))
+        await cancelReservation(reservationId)
+      }
+    } catch (err) {
+      console.error(`${action}Reservation failed, refetching...`, err)
+      await refetchWaitlist()
+    } finally {
+      setPendingFlag(reservationId, false)
+    }
+  }
+
   return (
     <div className="space-y-6">
-      {/* 등록 폼 */}
-      <div className="bg-gray-50 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">새 대기 등록</h3>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault()
-            if (isSubmitting) return
-            const size = Number(draft.size)
-            if (!draft.name || !size) return alert('이름/인원수를 확인하세요.')
-            try {
-              setIsSubmitting(true)
-              const created = await addWait({ name: draft.name, phone: draft.phone || undefined, size, note: draft.note || undefined })
-              // optimistic: 방금 추가된 항목이 실시간 이벤트 도착 전에도 보이도록 즉시 추가
-              if (created && (created.status === 'waiting' || created.status === 'called')) {
-                setRows(prev => {
-                  // 중복 방지(실시간과 겹칠 수 있음)
-                  if (prev.some(r => r.id === created.id)) return prev
-                  return [...prev, created as any].sort((a,b)=> a.created_at.localeCompare(b.created_at))
-                })
-              }
-              setDraft({ name: '', phone: '', size: '2', note: '' })
-            } finally {
-              setIsSubmitting(false)
-            }
-          }}
-          className="grid gap-4 sm:grid-cols-5"
-        >
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">고객명 *</label>
-            <input 
-              placeholder="이름" 
-              value={draft.name} 
-              onChange={e=>setDraft(s=>({...s, name:e.target.value}))} 
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">연락처</label>
-            <input 
-              placeholder="010-0000-0000" 
-              value={draft.phone} 
-              onChange={e=>setDraft(s=>({...s, phone:e.target.value}))} 
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">인원수 *</label>
-            <input 
-              placeholder="2" 
-              value={draft.size} 
-              onChange={e=>setDraft(s=>({...s, size:e.target.value}))} 
-              inputMode="numeric" 
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">메모</label>
-            <input 
-              placeholder="특별 요청사항" 
-              value={draft.note} 
-              onChange={e=>setDraft(s=>({...s, note:e.target.value}))} 
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? '등록 중...' : '등록하기'}
-            </button>
-          </div>
-        </form>
+      {/* 새 대기 등록 버튼과 호출 만료 처리 버튼 */}
+      <div className="flex justify-between items-center">
+        <div className="text-lg font-semibold text-gray-900">대기 관리</div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            ➕ 새 대기 등록
+          </button>
+          <button
+            onClick={() => setShowReservationModal(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+          >
+            📅 예약 등록
+          </button>
+          {(userRole === 'manager' || userRole === 'admin') && (
+            <form action={expireCalled5}>
+              <button className="px-4 py-2 border border-purple-300 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors">
+                호출 만료 처리 (5분)
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
+      {/* 대기 등록 모달 */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">새 대기 등록</h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (isSubmitting) return
+                const size = Number(draft.size)
+                if (!draft.name || !size) return alert('이름/인원수를 확인하세요.')
+                try {
+                  setIsSubmitting(true)
+                  const created = await addWait({ name: draft.name, phone: draft.phone || undefined, size, note: draft.note || undefined })
+                  // optimistic: 방금 추가된 항목이 실시간 이벤트 도착 전에도 보이도록 즉시 추가
+                  if (created && (created.status === 'waiting' || created.status === 'called')) {
+                    setRows(prev => {
+                      // 중복 방지(실시간과 겹칠 수 있음)
+                      if (prev.some(r => r.id === created.id)) return prev
+                      return [...prev, created as any].sort((a,b)=> a.created_at.localeCompare(b.created_at))
+                    })
+                  }
+                  setDraft({ name: '', phone: '', size: '2', note: '' })
+                  setShowAddModal(false) // 등록 완료 후 모달 닫기
+                } finally {
+                  setIsSubmitting(false)
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">고객명 *</label>
+                <input
+                  placeholder="이름"
+                  value={draft.name}
+                  onChange={e=>setDraft(s=>({...s, name:e.target.value}))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">연락처</label>
+                <input
+                  placeholder="010-0000-0000"
+                  value={draft.phone}
+                  onChange={e=>setDraft(s=>({...s, phone:e.target.value}))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">인원수 *</label>
+                <input
+                  placeholder="2"
+                  value={draft.size}
+                  onChange={e=>setDraft(s=>({...s, size:e.target.value}))}
+                  inputMode="numeric"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">메모</label>
+                <input
+                  placeholder="특별 요청사항"
+                  value={draft.note}
+                  onChange={e=>setDraft(s=>({...s, note:e.target.value}))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? '등록 중...' : '등록하기'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 예약 등록 모달 */}
+      {showReservationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">예약 등록</h3>
+              <button
+                onClick={() => setShowReservationModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (isSubmitting) return
+                const size = Number(reservationDraft.size)
+                const duration = Number(reservationDraft.duration)
+                const depositAmount = Number(reservationDraft.depositAmount)
+                if (!reservationDraft.name || !size || !reservationDraft.reservationTime) return alert('필수 정보를 모두 입력하세요.')
+                try {
+                  setIsSubmitting(true)
+                  const created = await addReservation({
+                    name: reservationDraft.name,
+                    phone: reservationDraft.phone || undefined,
+                    size,
+                    reservationTime: reservationDraft.reservationTime,
+                    duration,
+                    specialRequest: reservationDraft.specialRequest || undefined,
+                    depositAmount
+                  })
+                  // optimistic: 방금 추가된 항목이 실시간 이벤트 도착 전에도 보이도록 즉시 추가
+                  if (created && (created.status === 'waiting' || created.status === 'called')) {
+                    setRows(prev => {
+                      // 중복 방지(실시간과 겹칠 수 있음)
+                      if (prev.some(r => r.id === created.id)) return prev
+                      return [...prev, created as any].sort((a,b)=> a.created_at.localeCompare(b.created_at))
+                    })
+                  }
+                  setReservationDraft({
+                    name: '',
+                    phone: '',
+                    size: '2',
+                    reservationTime: '',
+                    duration: '120',
+                    specialRequest: '',
+                    depositAmount: '0'
+                  })
+                  setShowReservationModal(false) // 등록 완료 후 모달 닫기
+                } finally {
+                  setIsSubmitting(false)
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">고객명 *</label>
+                <input
+                  placeholder="이름"
+                  value={reservationDraft.name}
+                  onChange={e=>setReservationDraft(s=>({...s, name:e.target.value}))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">연락처</label>
+                <input
+                  placeholder="010-0000-0000"
+                  value={reservationDraft.phone}
+                  onChange={e=>setReservationDraft(s=>({...s, phone:e.target.value}))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">인원수 *</label>
+                <input
+                  placeholder="2"
+                  value={reservationDraft.size}
+                  onChange={e=>setReservationDraft(s=>({...s, size:e.target.value}))}
+                  inputMode="numeric"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">예약 시간 *</label>
+                <input
+                  type="datetime-local"
+                  value={reservationDraft.reservationTime}
+                  onChange={e=>setReservationDraft(s=>({...s, reservationTime:e.target.value}))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">예약 시간 (분)</label>
+                <input
+                  placeholder="120"
+                  value={reservationDraft.duration}
+                  onChange={e=>setReservationDraft(s=>({...s, duration:e.target.value}))}
+                  inputMode="numeric"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">특별 요청</label>
+                <input
+                  placeholder="특별 요청사항"
+                  value={reservationDraft.specialRequest}
+                  onChange={e=>setReservationDraft(s=>({...s, specialRequest:e.target.value}))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">예약금</label>
+                <input
+                  placeholder="0"
+                  value={reservationDraft.depositAmount}
+                  onChange={e=>setReservationDraft(s=>({...s, depositAmount:e.target.value}))}
+                  inputMode="decimal"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowReservationModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? '등록 중...' : '예약 등록'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
   {/* 상단 요약 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 md:col-span-1">
           <div className="flex items-center justify-between">
             <div>
       <p className="text-sm font-medium text-orange-600">대기중</p>
@@ -180,7 +407,7 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
           </div>
         </div>
         
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 md:col-span-1">
           <div className="flex items-center justify-between">
             <div>
       <p className="text-sm font-medium text-blue-600">호출됨</p>
@@ -189,28 +416,31 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
             <div className="text-2xl">📢</div>
           </div>
         </div>
-        
-    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+
+    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 md:col-span-1">
           <div className="flex items-center justify-between">
             <div>
-      <p className="text-sm font-medium text-green-600">테이블</p>
-      <p className="text-2xl font-bold text-green-900 mt-2">{availableTablesList.length === 0 ? '—' : availableTablesList.slice(0,4).map(t=>t.label).join(' · ')}{availableTablesList.length > 4 ? ' 등' : ''}</p>
+      <p className="text-sm font-medium text-purple-600">예약</p>
+      <p className="text-2xl font-bold text-purple-900 mt-1">{reservations.length}팀</p>
             </div>
-            <div className="text-2xl">🪑</div>
+            <div className="text-2xl">📅</div>
           </div>
         </div>
         
-        { (userRole === 'manager' || userRole === 'admin') && (
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <form action={expireCalled5}>
-              <button className="w-full h-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors">
-                호출 만료 처리
-                <br />
-                <span className="text-xs">(5분 기준)</span>
-              </button>
-            </form>
+    <div className="bg-green-50 border border-green-200 rounded-lg p-4 md:col-span-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+      <p className="text-sm font-medium text-green-600">사용 가능한 테이블</p>
+      <p className="text-lg font-bold text-green-900 mt-2 break-words">
+        {availableTablesList.length === 0 
+          ? '—' 
+          : availableTablesList.map(t=>t.label).join(' · ')
+        }
+      </p>
+            </div>
+            <div className="text-2xl ml-2">🪑</div>
           </div>
-        )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -234,6 +464,11 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                     <div>
                       <div className="font-semibold text-gray-900">{w.name}</div>
                       <div className="text-sm text-gray-500">{w.size}명 · {new Date(w.created_at).toLocaleTimeString()}</div>
+                      {(w as any).is_reservation && (w as any).reservation_time && (
+                        <div className="text-xs text-blue-600 font-medium">
+                          📅 예약: {new Date((w as any).reservation_time).toLocaleString('ko-KR')}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="text-sm text-gray-600">{w.phone || '-'}</div>
@@ -246,47 +481,26 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                 )}
                 
                 <div className="flex gap-2">
-                  <button 
-                    onClick={async () => {
-                      if (pending[w.id]) return
-                      setPendingFlag(w.id, true)
-                      // optimistic: waiting -> called
-                      setRows(prev => prev.map(r => r.id === w.id ? { ...r, status: 'called', called_at: new Date().toISOString() } as any : r))
-                      try {
-                        await callWait(w.id)
-                      } catch (err) {
-                        console.error('callWait failed, refetching...', err)
-                        await refetchWaitlist()
-                      } finally {
-                        setPendingFlag(w.id, false)
-                      }
-                    }} 
-                    className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                    disabled={!!pending[w.id]}
-                  >
-                    📢 호출
-                  </button>
-                  {(userRole === 'manager' || userRole === 'admin') && (
+                  {(w as any).is_reservation ? (
+                    // 예약 항목인 경우
                     <>
                       <button 
                         onClick={async () => {
                           if (pending[w.id]) return
                           setPendingFlag(w.id, true)
-                          // optimistic: 목록에서 제거 (waiting/called만 보이므로)
-                          setRows(prev => prev.filter(r => r.id !== w.id))
                           try {
-                            await cancelWait(w.id)
+                            await confirmReservation(w.id)
                           } catch (err) {
-                            console.error('cancelWait failed, refetching...', err)
+                            console.error('confirmReservation failed, refetching...', err)
                             await refetchWaitlist()
                           } finally {
                             setPendingFlag(w.id, false)
                           }
                         }} 
-                        className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                        className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
                         disabled={!!pending[w.id]}
                       >
-                        취소
+                        ✅ 예약 확인
                       </button>
                       <button 
                         onClick={async () => {
@@ -295,9 +509,9 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                           // optimistic: 목록에서 제거
                           setRows(prev => prev.filter(r => r.id !== w.id))
                           try {
-                            await noShowWait(w.id)
+                            await cancelReservation(w.id)
                           } catch (err) {
-                            console.error('noShowWait failed, refetching...', err)
+                            console.error('cancelReservation failed, refetching...', err)
                             await refetchWaitlist()
                           } finally {
                             setPendingFlag(w.id, false)
@@ -306,8 +520,76 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
                         className="px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
                         disabled={!!pending[w.id]}
                       >
-                        노쇼
+                        취소
                       </button>
+                    </>
+                  ) : (
+                    // 일반 대기 항목인 경우
+                    <>
+                      <button 
+                        onClick={async () => {
+                          if (pending[w.id]) return
+                          setPendingFlag(w.id, true)
+                          // optimistic: waiting -> called
+                          setRows(prev => prev.map(r => r.id === w.id ? { ...r, status: 'called', called_at: new Date().toISOString() } as any : r))
+                          try {
+                            await callWait(w.id)
+                          } catch (err) {
+                            console.error('callWait failed, refetching...', err)
+                            await refetchWaitlist()
+                          } finally {
+                            setPendingFlag(w.id, false)
+                          }
+                        }} 
+                        className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                        disabled={!!pending[w.id]}
+                      >
+                        📢 호출
+                      </button>
+                      {(userRole === 'manager' || userRole === 'admin') && (
+                        <>
+                          <button 
+                            onClick={async () => {
+                              if (pending[w.id]) return
+                              setPendingFlag(w.id, true)
+                              // optimistic: 목록에서 제거 (waiting/called만 보이므로)
+                              setRows(prev => prev.filter(r => r.id !== w.id))
+                              try {
+                                await cancelWait(w.id)
+                              } catch (err) {
+                                console.error('cancelWait failed, refetching...', err)
+                                await refetchWaitlist()
+                              } finally {
+                                setPendingFlag(w.id, false)
+                              }
+                            }} 
+                            className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                            disabled={!!pending[w.id]}
+                          >
+                            취소
+                          </button>
+                          <button 
+                            onClick={async () => {
+                              if (pending[w.id]) return
+                              setPendingFlag(w.id, true)
+                              // optimistic: 목록에서 제거
+                              setRows(prev => prev.filter(r => r.id !== w.id))
+                              try {
+                                await noShowWait(w.id)
+                              } catch (err) {
+                                console.error('noShowWait failed, refetching...', err)
+                                await refetchWaitlist()
+                              } finally {
+                                setPendingFlag(w.id, false)
+                              }
+                            }} 
+                            className="px-3 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 transition-colors"
+                            disabled={!!pending[w.id]}
+                          >
+                            노쇼
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -415,6 +697,76 @@ export default function WaitlistPanel({ initialRows, tables }: { initialRows: Wa
           </div>
         </section>
       </div>
+
+      {/* 예약 카드 섹션 */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <span className="mr-2">📅</span>
+            예약 ({reservations.length})
+          </h3>
+          <button
+            onClick={() => setShowReservationModal(true)}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            + 예약 등록
+          </button>
+        </div>
+        
+        {reservations.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {reservations.map((reservation) => (
+              <div key={reservation.id} className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h4 className="font-semibold text-purple-900">{reservation.name}</h4>
+                    <p className="text-sm text-purple-700">{reservation.phone}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleReservationAction(reservation.id, 'confirm')}
+                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                      disabled={!!pending[reservation.id]}
+                    >
+                      확인
+                    </button>
+                    <button
+                      onClick={() => handleReservationAction(reservation.id, 'cancel')}
+                      className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
+                      disabled={!!pending[reservation.id]}
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center text-purple-700">
+                    <span className="mr-2">👥</span>
+                    {reservation.size}명
+                  </div>
+                  <div className="flex items-center text-purple-700">
+                    <span className="mr-2">📅</span>
+                    {(reservation as any).reservation_time ? new Date((reservation as any).reservation_time).toLocaleString('ko-KR') : '시간 미정'}
+                  </div>
+                  {reservation.note && (
+                    <div className="flex items-start text-purple-700">
+                      <span className="mr-2 mt-0.5">📝</span>
+                      <span className="flex-1">{reservation.note}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <div className="text-4xl mb-2">📅</div>
+            <p>등록된 예약이 없습니다.</p>
+            <p className="text-sm mt-1">예약 등록 버튼을 눌러 새 예약을 추가하세요.</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -467,30 +819,56 @@ function SeatPicker({ waitId, tables, onAssigned }: { waitId: string; tables: Ta
     }
   }
 
+  const assignWithoutTable = async () => {
+    try {
+      await seatWait({ waitId })
+      // 부모에 즉시 반영 요청
+      onAssigned?.(waitId)
+    } catch (error) {
+      console.error('테이블 없이 배정 실패:', error)
+      alert('배정에 실패했습니다.')
+    }
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-3">
       <div className="text-sm font-medium text-gray-700 mb-2">테이블 배정</div>
-      <div className="flex gap-3">
-        <select 
-          value={tableId} 
-          onChange={e=>setTableId(e.target.value)} 
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        >
-          <option value="">테이블 선택</option>
-      {availableTables.map(t => (
-            <option key={t.id} value={t.id}>
-        {t.label} ({t.capacity}명) - {t.status === 'reserved' ? '예약됨' : '사용가능'}
-            </option>
-          ))}
-        </select>
-        <button 
-          onClick={assign} 
-          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!tableId}
-        >
-          🪑 배정
-        </button>
+      <div className="space-y-3">
+        <div className="flex gap-3">
+          <select
+            value={tableId}
+            onChange={e=>setTableId(e.target.value)}
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">테이블 선택 (선택사항)</option>
+        {availableTables.map(t => (
+              <option key={t.id} value={t.id}>
+          {t.label} ({t.capacity}명) - {t.status === 'reserved' ? '예약됨' : '사용가능'}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={assign}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!tableId}
+          >
+            🪑 배정
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex-1 text-sm text-gray-600">
+            또는 테이블 없이 바로 배정
+          </div>
+          <button
+            onClick={assignWithoutTable}
+            className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition-colors"
+          >
+            ⚡ 바로 배정
+          </button>
+        </div>
       </div>
+
       {availableTables.length === 0 && (
         <p className="text-sm text-orange-600 mt-2">⚠️ 현재 사용 가능한 테이블이 없습니다.</p>
       )}

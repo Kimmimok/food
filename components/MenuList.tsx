@@ -72,7 +72,7 @@ export default function MenuList({
     if (currentCat !== 'all') rows = rows.filter(r => r.category_id === currentCat)
   // 검색 기능 제거: no-op
     return rows.sort((a,b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-  }, [optimisticItems, items, currentCat, q])
+  }, [optimisticItems, items, currentCat])
 
   // 품절 토글(낙관적)
   const onToggle = async (id: string, next: boolean) => {

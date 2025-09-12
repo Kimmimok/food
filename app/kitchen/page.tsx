@@ -2,6 +2,12 @@
 import { supabaseServer } from '../../lib/supabase-server'
 import { requireRole } from '../../lib/auth'
 import { RealtimeSync } from '../../components/RealtimeSync'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Welcome Food - 주방 관리',
+  description: '주문 항목을 준비하세요',
+}
 
 const STATIONS = [
 	{ id: 'main', name: '메인 키친', desc: '메인 요리 및 밥류', icon: '🍳' },

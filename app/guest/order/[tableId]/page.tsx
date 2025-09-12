@@ -4,6 +4,16 @@ import CartClientScript from '@/components/CartClientScript'
 import ClientCart from '@/components/ClientCart'
 import { supabaseServer } from '@/lib/supabase-server'
 import ClientOrderPanel from '@/components/ClientOrderPanel'
+import type { Metadata } from 'next'
+
+export async function generateMetadata({ params }: any): Promise<Metadata> {
+  const tableId = params.tableId
+  
+  return {
+    title: `Welcome Food - 테이블 ${tableId}`,
+    description: '맛있는 음식을 주문하세요',
+  }
+}
 
 export default async function OrderQrPage({ params }: any) {
   const tableId = params.tableId

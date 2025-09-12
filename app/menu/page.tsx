@@ -3,7 +3,12 @@ import { cookies, headers } from 'next/headers'
 import { supabaseServer } from '@/lib/supabase-server'
 import MenuList from '@/components/MenuList'
 import CategoryTabs from '@/components/CategoryTabs'
+import type { Metadata } from 'next'
 
+export const metadata: Metadata = {
+  title: 'Welcome Food - 메뉴 관리',
+  description: '메뉴 항목을 관리하세요',
+}
 
 export default async function Page() {
 	const supabase = await supabaseServer()
