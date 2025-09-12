@@ -3,17 +3,26 @@ import React from 'react'
 import MenuGrid from '@/components/MenuGridClient'
 
 function getCategoryIdByName(categories: any[], names: string[]) {
-  if (!categories || categories.length === 0) return 'all'
-  const found = categories.find((c: any) => {
-    const cname = String(c.name || '').trim()
-    return names.some((n) => cname.includes(String(n)))
-  })
-  return found ? String(found.id) : 'all'
+  // 실제 데이터베이스의 category_id를 직접 사용
+  const categoryMap: Record<string, string> = {
+    '면류': '2c4d2466-fe19-40b7-8706-da93807e51a7',
+    '볶음': '329d54d7-9fae-45e0-8d0e-a16820460e2c',
+    '음료': 'd4306eec-af54-4c3e-b08d-ff01fae037cd',
+    '주류': '7abf5bd3-a903-4939-bae1-01d653089e9b'
+  };
+
+  for (const name of names) {
+    if (categoryMap[name]) {
+      return categoryMap[name];
+    }
+  }
+
+  return 'all';
 }
 
 function isActive(categories: any[], names: string[], activeCategory: string) {
   const id = getCategoryIdByName(categories, names)
-  return id !== 'all' && String(activeCategory) === String(id)
+  return activeCategory === id
 }
 
 function OrderHistoryModal({ cart, setCart, isOpen, onClose, tableId, onCompleted }: { cart: any[], setCart: React.Dispatch<React.SetStateAction<any[]>>, isOpen: boolean, onClose: () => void, tableId: string, onCompleted?: () => void }) {
@@ -188,8 +197,8 @@ export default function ClientOrderPanel({ tableId, items, categories = [] }: an
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <h3 className="text-lg font-semibold text-gray-900 mb-3">메뉴 선택</h3>
           <div className="flex gap-2">
-            <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['식사','음식']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['식사','음식'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>식사</button>
-            <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['안주']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['안주'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>안주</button>
+            <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['면류','볶음']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['면류','볶음'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>식사</button>
+            <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['볶음']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['볶음'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>안주</button>
             <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['주류']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['주류'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>주류</button>
             <button type="button" disabled={locked} onClick={() => setActiveCategory(getCategoryIdByName(categories, ['음료']))} className={`px-3 py-2 rounded-full border ${isActive(categories,['음료'], activeCategory) ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>음료</button>
             <button type="button" disabled={locked} onClick={() => setActiveCategory('all')} className={`px-3 py-2 rounded-full border ${activeCategory==='all' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}>전체</button>
