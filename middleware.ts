@@ -27,13 +27,24 @@ export function middleware(request: NextRequest) {
     return response
   }
 
+  // Vercel 도메인 처리 (임시로 모든 Vercel 도메인을 첫 번째 식당으로 매핑)
+  if (hostname.includes('vercel.app')) {
+    const response = NextResponse.next()
+    response.headers.set('x-restaurant-id', process.env.RESTAURANT_1_ID!)
+    response.headers.set('x-restaurant-domain', process.env.RESTAURANT_1_DOMAIN!)
+    return response
+  }
+
   // 도메인별 식당 정보 찾기
   const restaurant = restaurantConfig[hostname]
 
   if (!restaurant) {
-    // 알 수 없는 도메인 처리
+    // 알 수 없는 도메인 처리 - 기본 식당으로 리디렉션하지 말고 그냥 진행
     console.warn(`Unknown domain accessed: ${hostname}`)
-    return NextResponse.redirect(new URL('/404', request.url))
+    const response = NextResponse.next()
+    response.headers.set('x-restaurant-id', process.env.RESTAURANT_1_ID!)
+    response.headers.set('x-restaurant-domain', process.env.RESTAURANT_1_DOMAIN!)
+    return response
   }
 
   // 식당 정보를 헤더에 추가
