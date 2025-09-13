@@ -14,8 +14,7 @@ export default function SignInPage() {
     e.preventDefault()
     setLoading(true)
     setErr(null)
-    const client = supabase()
-    const { error } = await client.auth.signInWithPassword({ email, password })
+    const { error } = await supabase().auth.signInWithPassword({ email, password })
     setLoading(false)
     if (error) setErr(error.message)
     else window.location.href = '/'

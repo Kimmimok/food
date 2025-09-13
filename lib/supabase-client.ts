@@ -22,4 +22,6 @@ export function createClient() {
   return client
 }
 
-export const supabase = createClient()
+export function supabase() {
+  return createClient()
+}

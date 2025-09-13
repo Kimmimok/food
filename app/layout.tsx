@@ -6,6 +6,7 @@ import Toasts from '../components/Toast'
 import SoundAlerts from '../components/SoundAlerts'
 import OrderPopup from '../components/OrderPopup'
 import { RealtimeSync } from '../components/RealtimeSync'
+import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -16,13 +17,38 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { user, role } = await getUserAndRole()
   const isAuthed = !!user
+  const headersList = await headers()
+  const restaurantId = headersList.get('x-restaurant-id')
+
   let restaurantName = 'Restaurant POS'
+  let restaurantDomain = ''
+
   try {
     const sb = await supabaseServer()
-    const { data } = await sb.from('restaurant_settings').select('name').eq('id', 1).maybeSingle()
-    restaurantName = data?.name ?? restaurantName
+    if (restaurantId) {
+      // 멀티테넌시: restaurant_id로 식당 정보 조회
+      const { data } = await sb
+        .from('restaurant_settings')
+        .select('name, domain')
+        .eq('restaurant_id', restaurantId)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (data) {
+        restaurantName = data.name || restaurantName
+        restaurantDomain = data.domain || ''
+      }
+    } else {
+      // 기존 방식 (하위 호환성)
+      const { data } = await sb
+        .from('restaurant_settings')
+        .select('name')
+        .eq('id', 1)
+        .maybeSingle()
+      restaurantName = data?.name ?? restaurantName
+    }
   } catch (e) {
-    // ignore
+    console.error('Failed to load restaurant settings:', e)
   }
   return (
     <html lang="ko">

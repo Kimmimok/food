@@ -15,8 +15,7 @@ export default function SignUpPage() {
     e.preventDefault()
     setLoading(true)
     setErr(null)
-    const client = supabase()
-    const { data, error } = await client.auth.signUp({ email, password })
+    const { data, error } = await supabase().auth.signUp({ email, password })
     setLoading(false)
     if (error) {
       setErr(error.message)
@@ -27,7 +26,7 @@ export default function SignUpPage() {
     const user = data?.user ?? null
     try {
       if (user && user.id) {
-        await client.from('user_profile').upsert({ id: user.id, email, name, role: 'member' })
+        await supabase().from('user_profile').upsert({ id: user.id, email, name, role: 'member' })
         setSuccess('회원가입이 완료되었습니다. 자동 로그인되었습니다.')
         // 안전하게 홈으로 이동
         window.location.href = '/'

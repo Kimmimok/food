@@ -22,6 +22,13 @@ type KStatus = 'queued' | 'in_progress' | 'done' | 'served'
 
 /** 주방 상태 전이 + order_item.status 동기화 */
 export async function setKitchenStatus(orderItemId: string, next: KStatus) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   const map: Record<KStatus, string> = {
     queued: 'queued',
@@ -33,6 +40,7 @@ export async function setKitchenStatus(orderItemId: string, next: KStatus) {
     .from('order_item')
     .update({ status: map[next] })
     .eq('id', orderItemId)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (error) throw new Error(error.message)
   
   // Also update kitchen_queue if it exists for this order_item
@@ -40,6 +48,7 @@ export async function setKitchenStatus(orderItemId: string, next: KStatus) {
     .from('kitchen_queue')
     .update({ status: map[next] })
     .eq('order_item_id', orderItemId)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   // Ignore error if kitchen_queue row doesn't exist
   
   revalidatePath('/kitchen')
@@ -51,12 +60,20 @@ export async function setKitchenStatus(orderItemId: string, next: KStatus) {
 
 /** 스테이션의 미완료 티켓을 일괄 완료 처리 */
 export async function bulkMarkDone(station: string) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
 
   // find order_items by station
   const { data: items = [], error: e } = await supabase
     .from('order_item')
     .select('id, menu_item:menu_item_id(id, station), status')
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (e) throw new Error(e.message)
   const ids = items.filter((it:any)=> {
     const itemStation = it.menu_item?.station || 'main'
@@ -65,9 +82,17 @@ export async function bulkMarkDone(station: string) {
     return effectiveStation === station && ['queued','in_progress'].includes(it.status)
   }).map((it:any)=>it.id)
   if (ids.length) {
-    await supabase.from('order_item').update({ status: 'done' }).in('id', ids)
+    await supabase
+      .from('order_item')
+      .update({ status: 'done' })
+      .in('id', ids)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
     // Also update kitchen_queue
-    await supabase.from('kitchen_queue').update({ status: 'done' }).in('order_item_id', ids)
+    await supabase
+      .from('kitchen_queue')
+      .update({ status: 'done' })
+      .in('order_item_id', ids)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   }
   revalidatePath(`/kitchen/${station}`)
   revalidatePath(`/serving/${station}`)
@@ -79,11 +104,19 @@ export async function bulkMarkDone(station: string) {
 
 /** 완료된 것을 서빙완료 처리 */
 export async function bulkMarkServed(station: string) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
 
   const { data: items = [], error: e } = await supabase
     .from('order_item')
     .select('id, menu_item:menu_item_id(id, station), status')
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (e) throw new Error(e.message)
   const ids = items.filter((it:any)=> {
     const itemStation = it.menu_item?.station || 'main'
@@ -92,9 +125,17 @@ export async function bulkMarkServed(station: string) {
     return effectiveStation === station && it.status === 'done'
   }).map((it:any)=>it.id)
   if (ids.length) {
-    await supabase.from('order_item').update({ status: 'served' }).in('id', ids)
+    await supabase
+      .from('order_item')
+      .update({ status: 'served' })
+      .in('id', ids)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
     // Also update kitchen_queue
-    await supabase.from('kitchen_queue').update({ status: 'served' }).in('order_item_id', ids)
+    await supabase
+      .from('kitchen_queue')
+      .update({ status: 'served' })
+      .in('order_item_id', ids)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   }
   revalidatePath(`/kitchen/${station}`)
   revalidatePath(`/serving/${station}`)

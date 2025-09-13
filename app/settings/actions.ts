@@ -4,6 +4,7 @@ import { supabaseServer } from '@/lib/supabase-server'
 import { revalidatePath } from 'next/cache'
 import { requireRole } from '@/lib/auth'
 import { ensureAllTableTokens } from '@/app/order/actions'
+import { headers } from 'next/headers'
 
 export async function upsertRestaurantSettings(payload: {
   name?: string
@@ -20,6 +21,13 @@ export async function upsertRestaurantSettings(payload: {
   hide_urls_on_web?: boolean
 }) {
   await requireRole(['manager','admin'])
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await supabaseServer()
   const row = {
     id: 1,
@@ -36,6 +44,7 @@ export async function upsertRestaurantSettings(payload: {
   hide_urls_in_qr: typeof payload.hide_urls_in_qr === 'boolean' ? payload.hide_urls_in_qr : null,
   hide_urls_on_web: typeof payload.hide_urls_on_web === 'boolean' ? payload.hide_urls_on_web : null,
     updated_at: new Date().toISOString(),
+    restaurant_id: restaurantId, // restaurant_id 추가
   }
   const { error } = await supabase.from('restaurant_settings').upsert(row)
   if (error) throw new Error(error.message)
@@ -43,10 +52,21 @@ export async function upsertRestaurantSettings(payload: {
 }
 
 async function syncDiningTablesFromCount(desiredCount: number, defaultCapacity: number, capacities: number[] = []) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await supabaseServer()
 
   // fetch existing tables ordered by label (assume numeric labels if possible)
-  const { data: existing = [] } = await supabase.from('dining_table').select('id,label,capacity,status').order('label', { ascending: true })
+  const { data: existing = [] } = await supabase
+    .from('dining_table')
+    .select('id,label,capacity,status')
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
+    .order('label', { ascending: true })
 
   // convert labels to numbers when possible to identify next labels
   const numericLabels = existing.map((r:any) => ({ id: r.id, label: r.label, num: Number(r.label) || null }))
@@ -68,7 +88,7 @@ async function syncDiningTablesFromCount(desiredCount: number, defaultCapacity: 
     const start = existing.length + 1
     for (let i = start; i <= desiredCount; i++) {
       const cap = (capacities[i-1] ?? defaultCapacity) || defaultCapacity
-      toCreate.push({ label: String(i), capacity: cap, status: 'available' })
+      toCreate.push({ label: String(i), capacity: cap, status: 'available', restaurant_id: restaurantId }) // restaurant_id 추가
     }
   }
 
@@ -83,7 +103,11 @@ async function syncDiningTablesFromCount(desiredCount: number, defaultCapacity: 
 
   // perform updates
   for (const u of updates) {
-    await supabase.from('dining_table').update({ capacity: u.capacity, status: u.status ?? undefined }).eq('id', u.id)
+    await supabase
+      .from('dining_table')
+      .update({ capacity: u.capacity, status: u.status ?? undefined })
+      .eq('id', u.id)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   }
 
   if (toCreate.length) {
@@ -92,7 +116,11 @@ async function syncDiningTablesFromCount(desiredCount: number, defaultCapacity: 
 
   if (toRemove.length) {
     // mark removed so we don't delete historical orders; status 'removed'
-    await supabase.from('dining_table').update({ status: 'removed' }).in('id', toRemove)
+    await supabase
+      .from('dining_table')
+      .update({ status: 'removed' })
+      .in('id', toRemove)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   }
 }
 

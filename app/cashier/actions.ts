@@ -27,12 +27,20 @@ export async function payOrder({
   method: string
   amount: number
 }) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   // 1) 결제 저장
   const { error: e1 } = await supabase.from('payment').insert({
     order_id: orderId,
     method,
     amount,
+    restaurant_id: restaurantId, // restaurant_id 추가
   })
   if (e1) throw new Error(e1.message)
 
@@ -41,12 +49,22 @@ export async function payOrder({
     .from('order_ticket')
     .update({ status: 'paid', closed_at: new Date().toISOString() })
     .eq('id', orderId)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (e2) throw new Error(e2.message)
 
   // 3) 테이블 상태 dirty
-  const { data: order } = await supabase.from('order_ticket').select('table_id').eq('id', orderId).single()
+  const { data: order } = await supabase
+    .from('order_ticket')
+    .select('table_id')
+    .eq('id', orderId)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
+    .single()
   if (order?.table_id) {
-    await supabase.from('dining_table').update({ status: 'dirty' }).eq('id', order.table_id)
+    await supabase
+      .from('dining_table')
+      .update({ status: 'dirty' })
+      .eq('id', order.table_id)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   }
 
   revalidatePath('/cashier')

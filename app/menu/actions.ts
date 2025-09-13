@@ -4,14 +4,24 @@
 import { revalidatePath } from 'next/cache'
 import { requireRole } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase-server'
+import { headers } from 'next/headers'
 
 export async function toggleSoldOut(id: string, isSoldOut: boolean) {
   await requireRole(['manager','admin'])
+  const headersList = await headers()
+  const restaurantId = headersList.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await supabaseServer()
   const { error } = await supabase
     .from('menu_item')
     .update({ is_sold_out: isSoldOut })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
+
   if (error) throw new Error(error.message)
   revalidatePath('/menu')
 }
@@ -24,12 +34,20 @@ export async function upsertMenuItem(payload: {
   is_active?: boolean
 }) {
   await requireRole(['manager','admin'])
+  const headersList = await headers()
+  const restaurantId = headersList.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await supabaseServer()
   const row = {
     name: payload.name,
     price: payload.price,
     category_id: payload.category_id ?? null,
     is_active: payload.is_active ?? true,
+    restaurant_id: restaurantId, // restaurant_id 추가
   } as any
 
   // insert or update and return id
@@ -39,6 +57,7 @@ export async function upsertMenuItem(payload: {
       .from('menu_item')
       .update(row)
       .eq('id', payload.id)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
       .select('id')
       .single()
     if (error) throw new Error(error.message)
@@ -59,6 +78,13 @@ export async function upsertMenuItem(payload: {
 
 export async function deleteMenuItem(id: string) {
   await requireRole(['manager','admin'])
+  const headersList = await headers()
+  const restaurantId = headersList.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await supabaseServer()
 
   try {
@@ -67,6 +93,7 @@ export async function deleteMenuItem(id: string) {
       .from('menu_item')
       .select('id, name')
       .eq('id', id)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
       .single()
 
     if (fetchError) {
@@ -83,6 +110,8 @@ export async function deleteMenuItem(id: string) {
       .from('order_item')
       .select('id, order_id')
       .eq('menu_item_id', id)
+      // order_item에도 restaurant_id가 있다면 추가
+      .eq('restaurant_id', restaurantId)
 
     if (checkError) {
       console.error('Failed to check order items:', checkError)
@@ -98,6 +127,7 @@ export async function deleteMenuItem(id: string) {
       .from('menu_item')
       .delete()
       .eq('id', id)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
 
     if (deleteError) {
       console.error('Failed to delete menu item:', deleteError)
@@ -134,10 +164,18 @@ export async function deleteMenuItem(id: string) {
 
 export async function reorderMenuItems(order: { id: string; sort_order: number }[]) {
   await requireRole(['manager','admin'])
+  const headersList = await headers()
+  const restaurantId = headersList.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await supabaseServer()
   const updates = order.map(o => ({
     id: o.id,
     sort_order: o.sort_order,
+    restaurant_id: restaurantId, // restaurant_id 추가
   }))
   const { error } = await supabase.from('menu_item').upsert(updates as any)
   if (error) throw new Error(error.message)
@@ -147,6 +185,13 @@ export async function reorderMenuItems(order: { id: string; sort_order: number }
 // 이미지 URL 저장/초기화
 export async function setMenuItemImage(id: string, image_url: string | null) {
   await requireRole(['manager','admin'])
+  const headersList = await headers()
+  const restaurantId = headersList.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await supabaseServer()
 
   // RLS 정책을 우회하기 위해 service role 사용 (개발 환경에서만)
@@ -154,6 +199,7 @@ export async function setMenuItemImage(id: string, image_url: string | null) {
     .from('menu_item')
     .update({ image_url })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
 
   if (error) {
     console.error('Image update error:', error)

@@ -8,7 +8,9 @@ import { cookies, headers } from 'next/headers'
 async function sb() {
   const c = await cookies()
   const h = await headers()
-  return createServerClient(
+  const restaurantId = h.get('x-restaurant-id')
+
+  const client = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -16,15 +18,36 @@ async function sb() {
       headers: { get(n: string){ return h.get(n) as any } }
     }
   )
+
+  // restaurant_id 설정
+  if (restaurantId) {
+    await client.rpc('set_current_restaurant', { restaurant_id: restaurantId })
+  }
+
+  return client
 }
 
 export async function addWait({
   name, phone, size, note
 }: { name: string; phone?: string; size: number; note?: string }) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   const { data, error } = await supabase
     .from('waitlist')
-    .insert({ name, phone: phone ?? null, size, note: note ?? null, status: 'waiting' })
+    .insert({
+      name,
+      phone: phone ?? null,
+      size,
+      note: note ?? null,
+      status: 'waiting',
+      restaurant_id: restaurantId // restaurant_id 추가
+    })
     .select('*')
     .single()
   if (error) throw new Error(error.message)
@@ -33,11 +56,19 @@ export async function addWait({
 }
 
 export async function callWait(id: string) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   const { error } = await supabase
     .from('waitlist')
     .update({ status: 'called', called_at: new Date().toISOString() })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (error) throw new Error(error.message)
   revalidatePath('/waitlist')
 }
@@ -46,6 +77,13 @@ export async function callWait(id: string) {
 export async function seatWait({
   waitId, tableId
 }: { waitId: string; tableId?: string }) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
 
   // 테이블이 선택된 경우에만 테이블 상태 업데이트
@@ -54,6 +92,7 @@ export async function seatWait({
       .from('dining_table')
       .update({ status: 'seated' })
       .eq('id', tableId)
+      .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
     if (e1) throw new Error(e1.message)
   }
 
@@ -65,6 +104,7 @@ export async function seatWait({
       seated_table_id: tableId || null
     })
     .eq('id', waitId)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (e2) throw new Error(e2.message)
 
   revalidatePath('/waitlist')
@@ -72,30 +112,56 @@ export async function seatWait({
 }
 
 export async function cancelWait(id: string) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   const { error } = await supabase
     .from('waitlist')
     .update({ status: 'canceled' })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (error) throw new Error(error.message)
   revalidatePath('/waitlist')
 }
 
 export async function noShowWait(id: string) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   const { error } = await supabase
     .from('waitlist')
     .update({ status: 'no_show' })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (error) throw new Error(error.message)
   revalidatePath('/waitlist')
 }
 
 /** 자동 만료(호출 후 5분 지나면 waiting으로 되돌리거나 no_show로 표기하고 싶다면) */
 export async function expireCalledOlderThan(minutes = 5) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   try {
-    const { error } = await supabase.rpc('fn_waitlist_expire_called', { p_minutes: minutes })
+    const { error } = await supabase.rpc('fn_waitlist_expire_called', {
+      p_minutes: minutes,
+      p_restaurant_id: restaurantId // restaurant_id 파라미터 추가
+    })
     if (error) throw error
   } catch (err) {
     // If RPC does not exist or fails, fallback to a direct update:
@@ -107,6 +173,7 @@ export async function expireCalledOlderThan(minutes = 5) {
         .update({ status: 'waiting' })
         .lt('called_at', cutoff)
         .eq('status', 'called')
+        .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
       if (e2) throw e2
     } catch (e) {
       // If even fallback fails, surface the original error
@@ -133,6 +200,13 @@ export async function addReservation({
   specialRequest?: string;
   depositAmount?: number;
 }) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   const { data, error } = await supabase
     .from('waitlist')
@@ -146,6 +220,7 @@ export async function addReservation({
       reservation_duration: duration,
       special_request: specialRequest ?? null,
       deposit_amount: depositAmount,
+      restaurant_id: restaurantId, // restaurant_id 추가
       note: `예약: ${new Date(reservationTime).toLocaleString('ko-KR')} (${duration}분) ${specialRequest ? '- ' + specialRequest : ''}`
     })
     .select('*')
@@ -157,6 +232,13 @@ export async function addReservation({
 
 // 예약 확인/도착 처리
 export async function confirmReservation(id: string) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   const { error } = await supabase
     .from('waitlist')
@@ -167,12 +249,20 @@ export async function confirmReservation(id: string) {
       called_at: new Date().toISOString()
     })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (error) throw new Error(error.message)
   revalidatePath('/waitlist')
 }
 
 // 예약 취소
 export async function cancelReservation(id: string) {
+  const h = await headers()
+  const restaurantId = h.get('x-restaurant-id')
+
+  if (!restaurantId) {
+    throw new Error('Restaurant ID not found')
+  }
+
   const supabase = await sb()
   const { error } = await supabase
     .from('waitlist')
@@ -182,6 +272,7 @@ export async function cancelReservation(id: string) {
       reservation_time: null
     })
     .eq('id', id)
+    .eq('restaurant_id', restaurantId) // restaurant_id 필터 추가
   if (error) throw new Error(error.message)
   revalidatePath('/waitlist')
 }
